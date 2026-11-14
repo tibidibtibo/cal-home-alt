@@ -50,19 +50,75 @@ describe('ShutterPanelComponent', () => {
     expect(deviceServiceSpy.refresh).toHaveBeenCalled();
   });
 
+  const chips = (): HTMLButtonElement[] => Array.from(fixture.nativeElement.querySelectorAll('.presets .chip'));
+  const actions = (): HTMLButtonElement[] => Array.from(fixture.nativeElement.querySelectorAll('.action-buttons .act'));
+
+  /** Simule la remontée de l'état réel par la box : le volet a atteint sa cible. */
+  function reachTarget(level: number): void {
+    component.shutter = { ...component.shutter!, level };
+    component.ngOnChanges({ shutter: {} as any });
+    fixture.detectChanges();
+  }
+
   it('should trigger 25%, 50%, 75%, sun mode and configured favorites', () => {
-    const chips: HTMLButtonElement[] = Array.from(fixture.nativeElement.querySelectorAll('.presets .chip'));
-    expect(chips.length).toBe(6);
+    expect(chips().length).toBe(6);
+    expect(chips()[5].disabled).toBeTrue(); // P2 not configured
 
-    chips[0].click(); // 25%
+    chips()[0].click(); // 25%
     expect(deviceServiceSpy.setLevel).toHaveBeenCalledWith('0', 25);
+    reachTarget(25);
 
-    chips[3].click(); // Mode soleil (30%)
+    chips()[3].click(); // Mode soleil (30%)
     expect(deviceServiceSpy.setLevel).toHaveBeenCalledWith('0', 30);
+    reachTarget(30);
 
-    chips[4].click(); // P1 (40%)
+    chips()[4].click(); // P1 (40%)
     expect(deviceServiceSpy.setLevel).toHaveBeenCalledWith('0', 40);
+  });
 
-    expect(chips[5].disabled).toBeTrue(); // P2 not configured
+  it('should lock every control except Stop while a movement is in progress', () => {
+    expect(component.locked).toBeFalse();
+    chips()[0].click(); // 25% : cible différente du niveau actuel (50)
+    fixture.detectChanges();
+
+    expect(component.locked).toBeTrue();
+    expect(chips().every(c => c.disabled)).toBeTrue();
+    const [open, stop, close] = actions();
+    expect(open.disabled).toBeTrue();
+    expect(close.disabled).toBeTrue();
+    expect(stop.disabled).toBeFalse();
+    expect(fixture.nativeElement.querySelector('input[type=range]').disabled).toBeTrue();
+    expect(fixture.nativeElement.querySelector('button[aria-label="Actualiser le statut réel"]').disabled).toBeTrue();
+
+    chips()[1].click(); // ignoré : verrouillé
+    expect(deviceServiceSpy.setLevel).toHaveBeenCalledTimes(1);
+
+    reachTarget(25);
+    expect(component.locked).toBeFalse();
+    expect(chips()[1].disabled).toBeFalse();
+  });
+
+  it('should keep the Stop button usable and unlock the panel once stopped', () => {
+    deviceServiceSpy.stop.and.returnValue(of(undefined));
+    chips()[0].click();
+    fixture.detectChanges();
+    expect(component.locked).toBeTrue();
+
+    actions()[1].click();
+    fixture.detectChanges();
+    expect(deviceServiceSpy.stop).toHaveBeenCalledWith('0');
+    expect(component.locked).toBeFalse();
+    expect(actions()[0].disabled).toBeFalse();
+  });
+
+  it('should keep a constant layout: the status line is always rendered', () => {
+    const line = (): HTMLElement => fixture.nativeElement.querySelector('.moving');
+    expect(line()).toBeTruthy();
+    expect(line().classList.contains('moving--on')).toBeFalse();
+    chips()[0].click();
+    fixture.detectChanges();
+    expect(line()).toBeTruthy();
+    expect(line().classList.contains('moving--on')).toBeTrue();
+    expect(line().textContent).toContain('25%');
   });
 });

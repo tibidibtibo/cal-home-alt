@@ -4,7 +4,7 @@
       <div class="panel-header">
         <h2 class="panel-title">{{ shutter.name }}</h2>
         <div class="header-actions">
-          <button type="button" class="icon-btn" [disabled]="refreshing" (click)="onRefresh()"
+          <button type="button" class="icon-btn" [disabled]="refreshing || locked" (click)="onRefresh()"
                   title="Actualiser le statut réel" aria-label="Actualiser le statut réel">
             <i class="fa-solid fa-arrows-rotate" [class.fa-spin]="refreshing"></i>
           </button>
@@ -18,27 +18,39 @@
         </div>
       </div>
 
-      <div class="shutter-controls">
+      <div class="shutter-controls" [class.is-locked]="locked">
         <div class="status-block">
           <div class="level-row">
             <span class="level-value" aria-live="polite">{{ level }}<small>%</small></span>
             <ui-badge [type]="getStatusType()" [pill]="true">{{ getStatusLabel() }}</ui-badge>
           </div>
-          @if (moving) {
-            <span class="moving"><i class="fa-solid fa-spinner fa-spin"></i> En mouvement vers {{ targetLevel }}%…</span>
-          }
+          <span class="moving" [class.moving--on]="locked" aria-live="polite">
+            @if (busy) {
+              <i class="fa-solid fa-spinner fa-spin"></i> Envoi de la commande…
+            } @else if (moving) {
+              <i class="fa-solid fa-spinner fa-spin"></i> En mouvement vers {{ targetLevel }}%…
+            } @else {
+              &nbsp;
+            }
+          </span>
         </div>
 
-        <input type="range" min="0" max="100" step="1" [value]="level" [disabled]="busy"
+        <input type="range" min="0" max="100" step="1" [value]="level" [disabled]="locked"
                [attr.aria-label]="'Niveau d\'ouverture de ' + shutter.name"
                (input)="onLevelInput($event)" (change)="onLevelChange($event)">
 
         <div class="ctrl-row">
           <span class="ctrl-label">Commandes</span>
           <div class="action-buttons">
-            <ui-button variant="secondary" icon="fa-solid fa-chevron-up" [disabled]="busy" (clicked)="onOpen()">Ouvrir</ui-button>
-            <ui-button variant="secondary" icon="fa-solid fa-stop" [disabled]="busy" (clicked)="onStop()">Stop</ui-button>
-            <ui-button variant="secondary" icon="fa-solid fa-chevron-down" [disabled]="busy" (clicked)="onClose()">Fermer</ui-button>
+            <button type="button" class="act act--move" [disabled]="locked" (click)="onOpen()">
+              <i class="fa-solid fa-chevron-up" aria-hidden="true"></i><span>Ouvrir</span>
+            </button>
+            <button type="button" class="act act--stop" [class.act--stop-live]="locked" (click)="onStop()">
+              <i class="fa-solid fa-stop" aria-hidden="true"></i><span>Stop</span>
+            </button>
+            <button type="button" class="act act--move" [disabled]="locked" (click)="onClose()">
+              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i><span>Fermer</span>
+            </button>
           </div>
         </div>
 
@@ -46,21 +58,21 @@
           <span class="ctrl-label">Raccourcis</span>
           <div class="presets">
             @for (p of [25, 50, 75]; track p) {
-              <button type="button" class="chip" [disabled]="busy" (click)="setLevel(p)">{{ p }}%</button>
+              <button type="button" class="chip" [disabled]="locked" (click)="setLevel(p)">{{ p }}%</button>
             }
-            <button type="button" class="chip chip--sun" [disabled]="busy"
+            <button type="button" class="chip chip--sun" [disabled]="locked"
                     [title]="'Mode soleil (' + sunLevel + '%)'"
                     (click)="setLevel(sunLevel)">
               <i class="fa-solid fa-sun"></i> Mode soleil ({{ sunLevel }}%)
             </button>
             <button type="button" class="chip chip--fav"
-                    [disabled]="busy || shutter.p1_level == null"
+                    [disabled]="locked || shutter.p1_level == null"
                     [title]="shutter.p1_level != null ? 'Position favorite P1 (' + shutter.p1_level + '%)' : 'P1 non configuré (paramétrer dans le volet)'"
                     (click)="shutter.p1_level != null && setLevel(shutter.p1_level)">
               P1@if (shutter.p1_level != null) { ({{ shutter.p1_level }}%)}
             </button>
             <button type="button" class="chip chip--fav"
-                    [disabled]="busy || shutter.p2_level == null"
+                    [disabled]="locked || shutter.p2_level == null"
                     [title]="shutter.p2_level != null ? 'Position favorite P2 (' + shutter.p2_level + '%)' : 'P2 non configuré (paramétrer dans le volet)'"
                     (click)="shutter.p2_level != null && setLevel(shutter.p2_level)">
               P2@if (shutter.p2_level != null) { ({{ shutter.p2_level }}%)}
@@ -71,7 +83,7 @@
         @if (shutter.has_tilt) {
           <div class="ctrl-row">
             <span class="ctrl-label">Inclinaison ({{ shutter.tilt_angle }}°)</span>
-            <input type="range" min="0" max="100" step="1" [value]="shutter.tilt_angle" (change)="onTiltChange($event)">
+            <input type="range" min="0" max="100" step="1" [value]="shutter.tilt_angle" [disabled]="locked" (change)="onTiltChange($event)">
           </div>
         }
       </div>

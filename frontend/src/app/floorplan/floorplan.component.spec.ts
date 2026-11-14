@@ -130,6 +130,60 @@ describe('FloorplanComponent', () => {
     }, 100);
   });
 
+  it('should put a removed marker back in the list of unplaced equipment, and restore it on cancel', () => {
+    component.shutters = [{ ...LIVE_SHUTTER }];
+    component.enterEditMode();
+    expect(component.unplacedShutters.length).toBe(0);
+
+    component.deleteEquipment('0', new MouseEvent('click'));
+    expect(component.unplacedShutters.map(s => s.id)).toEqual(['0']);
+
+    component.cancelEdit();
+    expect(component.unplacedShutters.length).toBe(0);
+  });
+
+  it('should place equipment locally and only persist it on save', (done) => {
+    shutterSpy.updatePlacement.and.returnValue(of(undefined));
+    const other = { ...LIVE_SHUTTER, id: '1', name: 'B', db_id: 2, card_id: null, x: null, y: null };
+    component.shutters = [{ ...LIVE_SHUTTER }, other];
+    component.enterEditMode();
+    expect(component.unplacedShutters.map(s => s.id)).toEqual(['1']);
+
+    component.startPlacement('1');
+    spyOn<any>(component, 'toSvgPoint').and.returnValue({ x: 305, y: 207 });
+    component.onSvgClick(new MouseEvent('click'));
+
+    expect(shutterSpy.updatePlacement).not.toHaveBeenCalled(); // rien d'enregistré avant « Sauvegarder »
+    expect(component.unplacedShutters.length).toBe(0);
+    expect(component.floorplan!.devices.length).toBe(2);
+
+    component.saveEdit();
+    setTimeout(() => {
+      expect(shutterSpy.updatePlacement).toHaveBeenCalledWith(2, component.floorplan!.card.id, 300, 200);
+      done();
+    }, 100);
+  });
+
+  it('should keep dragging while the pointer is captured, and stop on release', () => {
+    component.enterEditMode();
+    fixture.detectChanges();
+    const svg: SVGSVGElement = fixture.nativeElement.querySelector('svg.floorplan-svg');
+    const capture = spyOn(svg, 'setPointerCapture');
+    spyOn<any>(component, 'toSvgPoint').and.returnValue({ x: 100, y: 100 });
+    const marker: SVGElement = fixture.nativeElement.querySelector('.equipment-marker');
+    marker.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7 }));
+    expect(capture).toHaveBeenCalledWith(7);
+
+    (component as any).toSvgPoint.and.returnValue({ x: 200, y: 140 });
+    svg.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 7 }));
+    expect(component.floorplan!.devices[0].x).toBe(200);
+
+    svg.dispatchEvent(new PointerEvent('lostpointercapture', { bubbles: true, pointerId: 7 }));
+    (component as any).toSvgPoint.and.returnValue({ x: 400, y: 400 });
+    svg.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 7 }));
+    expect(component.floorplan!.devices[0].x).toBe(200); // glissement terminé
+  });
+
   it('should return unplaced shutters', () => {
     expect(component.unplacedShutters.length).toBe(0);
   });
@@ -140,6 +194,7 @@ describe('FloorplanComponent', () => {
       { ...LIVE_SHUTTER, id: 'bottom', x: 100, y: 200, orientation: 200 },
       { ...LIVE_SHUTTER, id: 'wrap', x: 150, y: 50, orientation: 10 },
     ];
+    component.uiScale = 1; // indépendant de la largeur de la fenêtre de test
     component.setNorthAngle(-20);
 
     expect(component.northAngle).toBe(-20);
@@ -149,12 +204,41 @@ describe('FloorplanComponent', () => {
 
     const arrows = fixture.nativeElement.querySelectorAll('.orientation-arrow');
     expect(arrows.length).toBe(3);
-    expect(arrows[0].getAttribute('transform')).toBe('translate(100,50) rotate(0)');
-    expect(arrows[1].getAttribute('transform')).toBe('translate(100,200) rotate(180)');
-    expect(arrows[2].getAttribute('transform')).toBe('translate(150,50) rotate(350)');
+    expect(arrows[0].getAttribute('transform')).toBe('translate(100,50) scale(1) rotate(0)');
+    expect(arrows[1].getAttribute('transform')).toBe('translate(100,200) scale(1) rotate(180)');
+    expect(arrows[2].getAttribute('transform')).toBe('translate(150,50) scale(1) rotate(350)');
 
     const compassRotor = fixture.nativeElement.querySelector('.compass-indicator > g');
     expect(compassRotor.getAttribute('transform')).toBe('rotate(-20)');
+  });
+
+  it('should enlarge markers when the plan is displayed smaller than its viewBox (mobile)', () => {
+    component.uiScale = 1;
+    fixture.detectChanges();
+    const marker = (): SVGCircleElement => fixture.nativeElement.querySelector('.equipment-marker');
+    expect(+marker().getAttribute('r')!).toBe(14);
+
+    component.uiScale = 2;
+    fixture.detectChanges();
+    expect(+marker().getAttribute('r')!).toBe(28);
+  });
+
+  it('should use pointer events (touch + mouse) for dragging in edit mode', () => {
+    component.enterEditMode();
+    fixture.detectChanges();
+    const room: SVGElement = fixture.nativeElement.querySelector('.room-rect');
+    const spy = spyOn(component, 'onRoomMouseDown');
+    room.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('should offer a rename button on rooms in edit mode (no double-click on touch)', () => {
+    component.enterEditMode();
+    fixture.detectChanges();
+    const btn: SVGElement | null = fixture.nativeElement.querySelector('.rename-btn');
+    expect(btn).toBeTruthy();
+    btn!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(component.renamingRoomId).not.toBeNull();
   });
 
   it('should normalize a stored north angle above 180 to a negative angle', () => {

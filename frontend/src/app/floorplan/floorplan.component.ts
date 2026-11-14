@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ElementRef, ViewChild, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ElementRef, ViewChild, ChangeDetectorRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DeviceService } from '../devices/device.service';
@@ -37,6 +37,8 @@ export class FloorplanComponent implements OnInit, OnDestroy {
   saving = false;
   saveError = false;
   gridSize = 20;
+  /** Facteur d'agrandissement des éléments d'interface du SVG (poignées, marqueurs, textes) quand le plan est réduit à l'écran (mobile). 1 = taille normale. */
+  uiScale = 1;
 
   creatingCard = false;
   newCardName = '';
@@ -71,7 +73,27 @@ export class FloorplanComponent implements OnInit, OnDestroy {
     this.floorplanService.getFloorplan(cardId).subscribe(data => {
       this.floorplan = data;
       this.cdr.detectChanges();
+      this.updateUiScale();
     });
+  }
+
+  /** Mesure le plan affiché : sur petit écran le viewBox est réduit, on grossit donc les éléments tactiles pour qu'ils restent utilisables. */
+  @HostListener('window:resize')
+  @HostListener('window:orientationchange')
+  updateUiScale(): void {
+    const svg = this.svgEl?.nativeElement;
+    const vbWidth = Number((this.floorplan?.card.view_box ?? '').split(' ')[2]);
+    const width = svg?.getBoundingClientRect().width ?? 0;
+    const next = width > 0 && vbWidth > 0 ? Math.min(2.6, Math.max(1, Math.round((vbWidth / width) * 10) / 10)) : 1;
+    if (next !== this.uiScale) {
+      this.uiScale = next;
+      this.cdr.detectChanges();
+    }
+  }
+
+  /** Taille des textes : grossit moins vite que les poignées. */
+  get textScale(): number {
+    return Math.max(1, Math.round(this.uiScale * 6) / 10);
   }
 
   /** Garde les marqueurs du plan à jour avec le temps réel (niveau, pièce, position…). Jamais pendant l'édition : on écraserait les déplacements en cours. */
@@ -91,11 +113,11 @@ export class FloorplanComponent implements OnInit, OnDestroy {
 
   // --- Getters ---
 
+  /** Volets absents du plan affiché (y compris ceux qu'on vient de retirer en édition, avant sauvegarde). */
   get unplacedShutters(): DeviceState[] {
     if (!this.floorplan) return [];
-    return this.shutters.filter(s =>
-      s.card_id !== this.floorplan?.card.id || s.x == null || s.y == null
-    );
+    const placed = new Set(this.floorplan.devices.map(d => d.device_id ?? d.id));
+    return this.shutters.filter(s => !placed.has(s.id));
   }
 
   getShutter(id: string): DeviceState | undefined {
@@ -111,12 +133,12 @@ export class FloorplanComponent implements OnInit, OnDestroy {
 
   get compassX(): number {
     const vb = (this.floorplan?.card.view_box ?? '0 0 900 600').split(' ').map(Number);
-    return (vb[0] ?? 0) + (vb[2] ?? 900) - 36;
+    return (vb[0] ?? 0) + (vb[2] ?? 900) - 36 * this.uiScale;
   }
 
   get compassY(): number {
     const vb = (this.floorplan?.card.view_box ?? '0 0 900 600').split(' ').map(Number);
-    return (vb[1] ?? 0) + 36;
+    return (vb[1] ?? 0) + 36 * this.uiScale;
   }
 
   getArrowAngle(eq: EquipmentMarker): number {
@@ -168,6 +190,7 @@ export class FloorplanComponent implements OnInit, OnDestroy {
 
   enterEditMode(): void {
     if (!this.floorplan) return;
+    setTimeout(() => this.updateUiScale());
     this.syncMarkers();
     this.originalFloorplan = JSON.stringify(this.floorplan);
     this.editMode = true;
@@ -309,18 +332,8 @@ export class FloorplanComponent implements OnInit, OnDestroy {
 
     const device = this.shutters.find(s => s.id === this.placingShutterId);
     if (device && device.db_id != null) {
-      this.deviceService.updatePlacement(device.db_id, this.floorplan.card.id, x, y).subscribe({
-        next: () => {
-          device.card_id = this.floorplan!.card.id;
-          device.x = x;
-          device.y = y;
-          this.floorplan!.devices = [...this.floorplan!.devices, { ...device, x, y }];
-          this.cdr.detectChanges();
-        },
-        error: () => {
-          console.error('Failed to persist device placement');
-        }
-      });
+      // Local jusqu'à « Sauvegarder » (comme les autres modifications) : « Annuler » rétablit le plan d'origine.
+      this.floorplan.devices = [...this.floorplan.devices, { ...device, card_id: this.floorplan.card.id, x, y }];
     }
 
     this.placingShutterId = null;
@@ -344,6 +357,7 @@ export class FloorplanComponent implements OnInit, OnDestroy {
       type: 'room-move', id: String(room.id),
       offsetX: pt.x - room.x, offsetY: pt.y - room.y
     };
+    this.capturePointer(event);
   }
 
   onResizeMouseDown(event: MouseEvent, room: Room): void {
@@ -356,6 +370,7 @@ export class FloorplanComponent implements OnInit, OnDestroy {
       offsetX: pt.x - (room.x + room.width),
       offsetY: pt.y - (room.y + room.height)
     };
+    this.capturePointer(event);
   }
 
   onEquipmentMouseDown(event: MouseEvent, eq: EquipmentMarker): void {
@@ -367,6 +382,7 @@ export class FloorplanComponent implements OnInit, OnDestroy {
       type: 'equipment-move', id: eq.id,
       offsetX: pt.x - eq.x, offsetY: pt.y - eq.y
     };
+    this.capturePointer(event);
   }
 
   onSvgMouseMove(event: MouseEvent): void {
@@ -391,6 +407,13 @@ export class FloorplanComponent implements OnInit, OnDestroy {
 
   onSvgMouseUp(): void {
     this.dragState = null;
+  }
+
+  /** Garde le pointeur sur le SVG pendant un glissement : sans cela, au toucher, le geste est interrompu dès que le doigt quitte le marqueur. */
+  private capturePointer(event: MouseEvent): void {
+    const id = (event as PointerEvent).pointerId;
+    if (id === undefined) return;
+    try { this.svgEl.nativeElement.setPointerCapture(id); } catch { /* pointeur inconnu : sans effet */ }
   }
 
   onRenameInput(event: Event): void {

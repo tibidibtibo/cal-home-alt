@@ -5,6 +5,7 @@
 }
 
 .floorplan-toolbar {
+  .tb-group { display: contents; }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -145,6 +146,7 @@
     fill: transparent;
     stroke: currentColor;
     stroke-width: 2;
+    vector-effect: non-scaling-stroke;
 
     &.draggable { cursor: grab; &:active { cursor: grabbing; } }
   }
@@ -186,6 +188,20 @@
     &:hover .delete-circle { opacity: 1; }
   }
 
+  // ── Rename button (touch : pas de double-clic) ──
+  .rename-btn {
+    cursor: pointer;
+
+    .rename-circle { fill: var(--color-primary, #1976d2); opacity: 0.85; }
+    .rename-icon {
+      fill: #fff;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+    &:hover .rename-circle { opacity: 1; }
+  }
+
   // ── Equipment ──
   .equipment-hit-area {
     fill: transparent;
@@ -197,6 +213,7 @@
     fill: var(--color-text-muted, #9e9e9e);
     stroke: var(--color-surface, #fff);
     stroke-width: 2;
+    vector-effect: non-scaling-stroke;
     transition: fill 0.25s ease, filter 0.15s;
 
     &.status-open   { fill: var(--color-success, #4caf50); }
@@ -261,6 +278,11 @@
       dominant-baseline: auto;
     }
   }
+}
+
+// En édition, un glissement sur ces éléments les déplace : on empêche le navigateur de le prendre pour un défilement de la page.
+.floorplan-wrapper.edit-mode {
+  .floorplan-svg, .room-rect.draggable, .resize-handle, .equipment-marker.draggable { touch-action: none; }
 }
 
 // Enable label dblclick in edit mode
@@ -389,4 +411,54 @@
 
     &:hover { background: var(--color-border); }
   }
+}
+
+
+// ─── Mobile ─────────────────────────────────────────────────────────────────────
+
+@media (max-width: 720px) {
+  .floorplan-toolbar {
+    gap: 0.6rem;
+
+    .tb-group { display: flex; flex-wrap: wrap; gap: 0.5rem; width: 100%; }
+    .tb-group .btn { flex: 1 1 auto; text-align: center; padding: 0.55rem 0.7rem; }
+    .toolbar-spacer, .toolbar-sep { display: none; }
+
+    // Sélecteur de carte et bouton « Modifier » : pleine largeur
+    .card-selector { flex: 1 1 10rem; select { width: 100%; } }
+    .btn-edit { flex: 0 0 auto; }
+
+    // Barre Annuler / Sauvegarder : toujours accessible en bas de l'écran
+    .tb-group--save {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; width: auto;
+      flex-wrap: nowrap; gap: 0.6rem;
+      padding: 0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
+      background: var(--color-background, #fff);
+      border-top: 1px solid var(--color-border);
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+      .save-error { flex: 1 0 100%; text-align: center; }
+      .btn { flex: 1 1 0; }
+    }
+  }
+
+  .north-control {
+    width: 100%;
+    gap: 0.6rem;
+    .north-slider { flex: 1; width: auto; min-width: 0; height: 1.6rem; }
+    .north-number { flex: 0 0 4rem; }
+  }
+
+  // Le plan passe avant, la liste des équipements en dessous
+  .floorplan-layout { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+  .floorplan-wrapper { flex: none; width: 100%; box-sizing: border-box; padding: 0.4rem; }
+  .floorplan-page:has(.edit-mode) { padding-bottom: 5.5rem; } // place pour la barre fixe
+
+  .unplaced-panel {
+    width: auto;
+    box-sizing: border-box;
+    flex-shrink: 1;
+    .unplaced-item { padding: 0.65rem 0.6rem; border: 1px solid var(--color-border); border-radius: var(--radius-md, 0.5rem); }
+  }
+
+  .rename-overlay { width: calc(100% - 2rem); min-width: 0; box-sizing: border-box; .rename-input { font-size: 16px; } }
 }

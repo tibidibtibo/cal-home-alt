@@ -26,19 +26,38 @@ interface LogPage {
   imports: [CommonModule, UiCardComponent, UiButtonComponent, UiBadgeComponent, FormsModule],
   templateUrl: './logs.component.html',
   styles: [`
-    .logs-table-wrap { overflow-x: auto; margin-top: 1rem; }
-    .logs-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .logs-table th, .logs-table td { padding: 0.6rem; text-align: left; border-bottom: 1px solid var(--color-border); vertical-align: top; }
-    .logs-table th { color: var(--color-text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
-    .level-badge { font-weight: 700; }
-    .timestamp { color: var(--color-text-muted); white-space: nowrap; }
-    .logger { color: var(--color-text-muted); white-space: nowrap; }
-    .msg { word-break: break-word; }
-    .filters { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
+    .filters { display: flex; gap: 0.75rem 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
     .filter-group { display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; }
     .filter-group select { padding: 0.4rem; border-radius: 4px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
-    .pager { display: flex; align-items: center; justify-content: flex-end; gap: 1rem; margin-top: 1rem; }
-    .pager-info { color: var(--color-text-muted); font-size: 0.85rem; }
+
+    .logs-table-wrap { margin-top: 1rem; }
+    .logs-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; table-layout: auto; }
+    .logs-table th, .logs-table td { padding: 0.55rem 0.6rem; text-align: left; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+    .logs-table th { color: var(--color-text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; white-space: nowrap; }
+    .level-badge { font-weight: 700; }
+    .timestamp { color: var(--color-text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .logger { color: var(--color-text-muted); font-family: var(--font-family-mono); font-size: 0.78rem; overflow-wrap: anywhere; }
+    .msg { width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4; }
+    .empty { text-align: center; padding: 2rem; color: var(--color-text-muted); }
+    .pager { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem 1rem; margin-top: 1rem; flex-wrap: wrap; }
+    .pager-info { color: var(--color-text-muted); font-size: 0.85rem; margin-right: auto; }
+
+    /* Écran étroit : une carte par entrée (en-tête sur une ligne, message pleine largeur) au lieu d'un tableau qui déborde. */
+    @media (max-width: 720px) {
+      .logs-table, .logs-table tbody { display: block; }
+      .logs-table thead { display: none; }
+      .logs-table tr.entry {
+        display: grid; grid-template-columns: auto auto 1fr; grid-template-areas: "ts lvl src" "msg msg msg";
+        align-items: center; gap: 0.3rem 0.6rem; padding: 0.7rem 0.2rem; border-bottom: 1px solid var(--color-border);
+      }
+      .logs-table tr.entry td { display: block; padding: 0; border: 0; }
+      .logs-table td.timestamp { grid-area: ts; font-size: 0.78rem; }
+      .logs-table td.level { grid-area: lvl; }
+      .logs-table td.logger { grid-area: src; justify-self: end; text-align: right; min-width: 0; }
+      .logs-table td.msg { grid-area: msg; width: auto; font-size: 0.88rem; }
+      .logs-table tr.empty-row, .logs-table tr.empty-row td { display: block; border: 0; }
+      .pager-info { flex-basis: 100%; }
+    }
   `]
 })
 export class LogsComponent implements OnInit {

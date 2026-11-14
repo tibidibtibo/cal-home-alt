@@ -41,13 +41,13 @@ Il vous faut **Python 3.10+** et **Node.js 20.19+** (la première fois seulement
 ```bash
 git clone https://github.com/tibidibtibo/cal-home-alt.git
 cd cal-home-alt
-python run.py            # Windows : py run.py
+./start.sh               # Windows : start.bat (équivalent de : python run.py)
 ```
 
 Le script crée l'environnement Python, installe les dépendances, construit l'interface, démarre le serveur et ouvre
 `http://localhost:9050` dans votre navigateur. Le premier lancement prend quelques minutes ; les suivants quelques secondes.
 
-Pour essayer sans box : `python run.py --mock` (volets simulés).
+Pour essayer sans box : `./start.sh --mock` (volets simulés).
 
 ### Première configuration
 

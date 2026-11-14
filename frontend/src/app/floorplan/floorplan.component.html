@@ -13,8 +13,10 @@
         Modifier le plan
       </button>
     } @else {
-      <button class="btn btn-add-room" (click)="addRoom()">+ Ajouter une pièce</button>
-      <button class="btn btn-grid" (click)="cycleGridSize()">Grille : {{ gridSize }}</button>
+      <div class="tb-group tb-group--rooms">
+        <button class="btn btn-add-room" (click)="addRoom()">+ Ajouter une pièce</button>
+        <button class="btn btn-grid" (click)="cycleGridSize()">Grille : {{ gridSize }}</button>
+      </div>
       <label class="north-control">
         Nord
         <input type="range" class="north-slider"
@@ -27,18 +29,22 @@
           min="-180" max="180" step="1">°
       </label>
       <span class="toolbar-sep"></span>
-      <button class="btn btn-new-card" (click)="startCreateCard()">+ Nouvelle carte</button>
-      <button class="btn btn-rename-card" (click)="startRenameCard()">Renommer carte</button>
-      <button class="btn btn-delete-card" (click)="deleteCard()"
-              [disabled]="(floorplan?.all_cards?.length ?? 0) <= 1">Supprimer carte</button>
+      <div class="tb-group tb-group--cards">
+        <button class="btn btn-new-card" (click)="startCreateCard()">+ Nouvelle carte</button>
+        <button class="btn btn-rename-card" (click)="startRenameCard()">Renommer carte</button>
+        <button class="btn btn-delete-card" (click)="deleteCard()"
+                [disabled]="(floorplan?.all_cards?.length ?? 0) <= 1">Supprimer carte</button>
+      </div>
       <span class="toolbar-spacer"></span>
-      @if (saveError) {
-        <span class="save-error">Échec de la sauvegarde</span>
-      }
-      <button class="btn btn-cancel" (click)="cancelEdit()">Annuler</button>
-      <button class="btn btn-save" (click)="saveEdit()" [disabled]="saving">
-        {{ saving ? 'Sauvegarde...' : 'Sauvegarder' }}
-      </button>
+      <div class="tb-group tb-group--save">
+        @if (saveError) {
+          <span class="save-error">Échec de la sauvegarde</span>
+        }
+        <button class="btn btn-cancel" (click)="cancelEdit()">Annuler</button>
+        <button class="btn btn-save" (click)="saveEdit()" [disabled]="saving">
+          {{ saving ? 'Sauvegarde...' : 'Sauvegarder' }}
+        </button>
+      </div>
     }
   </div>
 
@@ -51,10 +57,14 @@
         <svg #svgEl
              [attr.viewBox]="floorplan.card.view_box"
              class="floorplan-svg"
-             (mousemove)="onSvgMouseMove($event)"
-             (mouseup)="onSvgMouseUp()"
-             (mouseleave)="onSvgMouseUp()"
+             (pointermove)="onSvgMouseMove($event)"
+             (pointerup)="onSvgMouseUp()"
+             (pointercancel)="onSvgMouseUp()"
+             (lostpointercapture)="onSvgMouseUp()"
              (click)="onSvgClick($event)">
+
+          @let k = uiScale;
+          @let t = textScale;
 
           @if (editMode) {
             <defs>
@@ -74,13 +84,14 @@
                 [attr.height]="room.height"
                 class="room-rect"
                 [class.draggable]="editMode"
-                (mousedown)="onRoomMouseDown($event, room)"
+                (pointerdown)="onRoomMouseDown($event, room)"
               />
 
               @if (renamingRoomId !== room.id) {
                 <text
                   [attr.x]="room.x + room.width / 2"
-                  [attr.y]="room.y + room.height / 2 + 8"
+                  [attr.y]="room.y + room.height / 2 + 8 * t"
+                  [style.font-size.px]="22.4 * t"
                   class="room-label"
                   (dblclick)="startRename(room.id, room.name, $event)"
                   (click)="editMode && $event.stopPropagation()"
@@ -89,25 +100,41 @@
 
               @if (editMode) {
                 <rect
-                  [attr.x]="room.x + room.width - 14"
-                  [attr.y]="room.y + room.height - 14"
-                  width="14" height="14" rx="3"
+                  [attr.x]="room.x + room.width - 12 * k"
+                  [attr.y]="room.y + room.height - 12 * k"
+                  [attr.width]="12 * k" [attr.height]="12 * k" [attr.rx]="3 * k"
                   class="resize-handle"
-                  (mousedown)="onResizeMouseDown($event, room)"
+                  (pointerdown)="onResizeMouseDown($event, room)"
                 />
 
                 <g class="delete-btn" (click)="deleteRoom(room.id, $event)">
                   <circle
-                    [attr.cx]="room.x + room.width - 10"
-                    [attr.cy]="room.y + 10"
-                    r="9"
+                    [attr.cx]="room.x + room.width - 9 * k"
+                    [attr.cy]="room.y + 9 * k"
+                    [attr.r]="9 * k"
                     class="delete-circle"
                   />
                   <text
-                    [attr.x]="room.x + room.width - 10"
-                    [attr.y]="room.y + 10"
+                    [attr.x]="room.x + room.width - 9 * k"
+                    [attr.y]="room.y + 9 * k"
+                    [style.font-size.px]="8 * k"
                     class="delete-icon"
                   >✕</text>
+                </g>
+
+                <g class="rename-btn" (click)="startRename(room.id, room.name, $event)">
+                  <circle
+                    [attr.cx]="room.x + 9 * k"
+                    [attr.cy]="room.y + 9 * k"
+                    [attr.r]="9 * k"
+                    class="rename-circle"
+                  />
+                  <text
+                    [attr.x]="room.x + 9 * k"
+                    [attr.y]="room.y + 9 * k"
+                    [style.font-size.px]="9 * k"
+                    class="rename-icon"
+                  >✎</text>
                 </g>
               }
             </g>
@@ -119,26 +146,26 @@
                 <circle
                   [attr.cx]="eq.x"
                   [attr.cy]="eq.y"
-                  r="24"
+                  [attr.r]="24 * k"
                   class="equipment-hit-area"
                 />
               }
               <circle
                 [attr.cx]="eq.x"
                 [attr.cy]="eq.y"
-                r="14"
+                [attr.r]="14 * k"
                 class="equipment-marker"
                 [class.status-open]="eq.status === 'open'"
                 [class.status-middle]="eq.status === 'middle'"
                 [class.status-close]="eq.status === 'close'"
                 [class.draggable]="editMode"
                 [class.clickable]="!editMode"
-                (mousedown)="onEquipmentMouseDown($event, eq)"
+                (pointerdown)="onEquipmentMouseDown($event, eq)"
               />
 
               @if (hasOrientation(eq)) {
                 <g class="orientation-arrow"
-                   [attr.transform]="'translate(' + eq.x + ',' + eq.y + ') rotate(' + getArrowAngle(eq) + ')'">
+                   [attr.transform]="'translate(' + eq.x + ',' + eq.y + ') scale(' + k + ') rotate(' + getArrowAngle(eq) + ')'">
                   <line x1="0" y1="5" x2="0" y2="-5" class="arrow-shaft"/>
                   <polygon points="0,-10 -4,-4 4,-4" class="arrow-head"/>
                 </g>
@@ -146,21 +173,23 @@
 
               <text
                 [attr.x]="eq.x"
-                [attr.y]="eq.y + 26"
+                [attr.y]="eq.y + 14 * k + 12 * t"
+                [style.font-size.px]="11.2 * t"
                 class="equipment-label"
               >{{ eq.name }}</text>
 
               @if (editMode) {
                 <g class="delete-btn" (click)="deleteEquipment(eq.id, $event)">
                   <circle
-                    [attr.cx]="eq.x + 12"
-                    [attr.cy]="eq.y - 12"
-                    r="8"
+                    [attr.cx]="eq.x + 12 * k"
+                    [attr.cy]="eq.y - 12 * k"
+                    [attr.r]="9 * k"
                     class="delete-circle"
                   />
                   <text
-                    [attr.x]="eq.x + 12"
-                    [attr.y]="eq.y - 12"
+                    [attr.x]="eq.x + 12 * k"
+                    [attr.y]="eq.y - 12 * k"
+                    [style.font-size.px]="9.6 * k"
                     class="delete-icon"
                   >✕</text>
                 </g>
@@ -170,7 +199,7 @@
 
           <!-- Compass rose -->
           <g class="compass-indicator"
-             [attr.transform]="'translate(' + compassX + ',' + compassY + ')'">
+             [attr.transform]="'translate(' + compassX + ',' + compassY + ') scale(' + k + ')'">
             <circle r="22" class="compass-bg"/>
             <g [attr.transform]="'rotate(' + northAngle + ')'">
               <line x1="0" y1="14" x2="0" y2="-14" class="compass-axis"/>

@@ -34,9 +34,9 @@
       </thead>
       <tbody>
         @for (log of logs; track $index) {
-          <tr>
+          <tr class="entry">
             <td class="timestamp">{{ formatTs(log.ts) }}</td>
-            <td>
+            <td class="level">
               <ui-badge [type]="getBadgeType(log.level)" [pill]="true" class="level-badge">
                 {{ log.level }}
               </ui-badge>
@@ -46,8 +46,8 @@
           </tr>
         }
         @if (logs.length === 0 && !loading) {
-          <tr>
-            <td colspan="4" style="text-align: center; padding: 2rem; color: var(--color-text-muted);">
+          <tr class="empty-row">
+            <td colspan="4" class="empty">
               Aucun log trouvé.
             </td>
           </tr>
