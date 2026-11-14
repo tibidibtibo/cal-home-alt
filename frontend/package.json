@@ -1,6 +1,6 @@
 {
   "name": "cal-home-alt-frontend",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "start": "ng serve --proxy-config proxy.conf.json --port 9051",
