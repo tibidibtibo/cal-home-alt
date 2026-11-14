@@ -1,0 +1,169 @@
+<div class="wizard">
+  <div class="wizard__head">
+    <span class="wizard__brand"><img src="assets/logo.svg" alt="" width="32" height="32" /> Configuration de Cal-Home Alt</span>
+    @if (alreadyDone()) { <a routerLink="/home" class="ui-btn ui-btn--ghost ui-btn--sm">Quitter l'assistant</a> }
+  </div>
+
+  <ol class="steps" aria-label="Étapes">
+    @for (s of steps; track s; let i = $index) {
+      <li [class.done]="i < step()" [class.current]="i === step()" [attr.aria-current]="i === step() ? 'step' : null">
+        @if (i < step()) { <i class="fa-solid fa-circle-check" aria-hidden="true"></i> } @else { <span>{{ i + 1 }}.</span> }
+        {{ s }}
+      </li>
+    }
+  </ol>
+
+  <div class="panel">
+    @if (error()) { <ui-alert type="error">{{ error() }}</ui-alert> }
+    @if (info()) { <ui-alert type="info">{{ info() }}</ui-alert> }
+
+    @switch (step()) {
+      @case (0) {
+        <h1>Votre maison</h1>
+        <p class="lead">Commençons par un nom : il s'affichera dans l'en-tête et sur le plan.</p>
+        <div class="form-group">
+          <label for="house-name">Nom de la maison</label>
+          <input id="house-name" type="text" maxlength="60" placeholder="Ex. Maison, Chez nous, Résidence des Pins…"
+                 [(ngModel)]="houseName" (keyup.enter)="next()" autofocus />
+        </div>
+      }
+      @case (1) {
+        <h1>Votre box Calyps'HOME</h1>
+        <p class="lead">L'application pilote vos volets via la box, sur votre réseau local. Vous trouverez son adresse IP dans l'interface de votre routeur
+          (liste des appareils connectés). Le compte est celui de l'application Calyps'HOME.</p>
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="box-host">Adresse IP de la box</label>
+            <input id="box-host" type="text" inputmode="decimal" placeholder="192.168.1.50" [(ngModel)]="boxHost" />
+          </div>
+          <div class="form-group">
+            <label for="box-mac">Adresse MAC <span class="form-hint">(facultatif)</span></label>
+            <input id="box-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF" [(ngModel)]="boxMac" />
+          </div>
+          <div class="form-group">
+            <label for="box-login">E-mail du compte Calyps'HOME</label>
+            <input id="box-login" type="text" autocomplete="off" [(ngModel)]="boxLogin" />
+          </div>
+          <div class="form-group">
+            <label for="box-password">Mot de passe</label>
+            <input id="box-password" type="password" autocomplete="new-password" [(ngModel)]="boxPassword"
+                   [placeholder]="boxPasswordSet ? '•••••••• (déjà enregistré)' : ''" />
+          </div>
+        </div>
+        <p class="form-hint">Ces informations restent sur cet ordinateur et ne servent qu'à parler à votre box.
+          Sans box sous la main, passez cette étape : lancez l'application avec <code>python run.py --mock</code> pour essayer avec des volets simulés.</p>
+      }
+      @case (2) {
+        <h1>Localisation</h1>
+        <p class="lead">Elle sert à calculer le lever et le coucher du soleil, utilisés par vos automatisations.</p>
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="lat">Latitude</label>
+            <input id="lat" type="number" step="0.0001" min="-90" max="90" [(ngModel)]="latitude" />
+          </div>
+          <div class="form-group">
+            <label for="lon">Longitude</label>
+            <input id="lon" type="number" step="0.0001" min="-180" max="180" [(ngModel)]="longitude" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="tz">Fuseau horaire</label>
+          <input id="tz" type="text" placeholder="Europe/Paris" [(ngModel)]="timezone" />
+          <span class="form-hint">Nom IANA, par exemple Europe/Paris, Europe/Brussels, America/Montreal.</span>
+        </div>
+        <ui-button variant="secondary" size="sm" icon="fa-solid fa-location-crosshairs" (clicked)="useMyPosition()">Utiliser ma position</ui-button>
+      }
+      @case (3) {
+        <h1>Les pièces</h1>
+        <p class="lead">Ajoutez les pièces qui ont des volets. Elles apparaissent sur le plan, que vous pourrez ensuite dessiner à votre goût (déplacer, redimensionner).</p>
+        <div class="add-row">
+          <input type="text" maxlength="60" placeholder="Nom de la pièce" aria-label="Nom de la pièce" [(ngModel)]="newRoom" (keyup.enter)="addRoom()" />
+          <ui-button variant="primary" icon="fa-solid fa-plus" [disabled]="busy() || !newRoom.trim()" (clicked)="addRoom()">Ajouter</ui-button>
+        </div>
+        <div class="chips" aria-label="Suggestions">
+          @for (s of roomSuggestions; track s) {
+            <button type="button" class="chip" [disabled]="busy()" (click)="addRoom(s)">+ {{ s }}</button>
+          }
+        </div>
+        @if (rooms().length === 0) {
+          <p class="form-hint">Aucune pièce pour l'instant.</p>
+        } @else {
+          <ul class="room-list">
+            @for (r of rooms(); track r.id) {
+              <li><span>{{ r.name }}</span>
+                <ui-button variant="ghost" size="sm" icon="fa-solid fa-trash" title="Supprimer {{ r.name }}" (clicked)="deleteRoom(r)"></ui-button>
+              </li>
+            }
+          </ul>
+        }
+      }
+      @case (4) {
+        <h1>Vos volets</h1>
+        <p class="lead">Voici les volets détectés sur la box. Donnez-leur un nom, une pièce et l'orientation de la façade : elle sert aux automatisations selon le soleil.</p>
+        @if (busy() && rows().length === 0) {
+          <ui-alert type="info">Recherche des volets sur la box…</ui-alert>
+        }
+        @if (boxUnreachable()) {
+          <ui-alert type="warning" title="Box injoignable">
+            Impossible de lire les volets pour l'instant. Vérifiez l'étape « Box » (retour en arrière) ou continuez : vous pourrez les classer plus tard dans « Volets ».
+          </ui-alert>
+        } @else if (!busy() && rows().length === 0) {
+          <ui-alert type="info">Aucun volet détecté. Vous pourrez relancer la détection depuis la page « Volets ».</ui-alert>
+        }
+        <div class="shutter-rows">
+          @for (r of rows(); track r.id) {
+            <div class="shutter-row">
+              <div class="api-name"><i class="fa-solid fa-window-maximize" aria-hidden="true"></i> {{ r.apiName }}</div>
+              <div>
+                <label [attr.for]="'n' + r.id">Nom affiché</label>
+                <input [id]="'n' + r.id" type="text" maxlength="60" [placeholder]="r.apiName" [(ngModel)]="r.name" />
+              </div>
+              <div>
+                <label [attr.for]="'r' + r.id">Pièce</label>
+                <select [id]="'r' + r.id" [(ngModel)]="r.roomId">
+                  <option [ngValue]="null">— Non classé —</option>
+                  @for (room of rooms(); track room.id) { <option [ngValue]="room.id">{{ room.name }}</option> }
+                </select>
+              </div>
+              <div>
+                <label [attr.for]="'o' + r.id">Façade orientée vers</label>
+                <select [id]="'o' + r.id" [(ngModel)]="r.orientation">
+                  @for (o of orientations; track o.value) { <option [ngValue]="o.value">{{ o.label }}</option> }
+                </select>
+              </div>
+            </div>
+          }
+        </div>
+      }
+      @case (5) {
+        <h1><i class="fa-solid fa-circle-check" style="color: var(--color-success)" aria-hidden="true"></i> C'est prêt !</h1>
+        <p class="lead">Votre maison « {{ houseName }} » est configurée. Tout reste modifiable plus tard dans les Paramètres.</p>
+        <ul class="summary">
+          <li><span>Box</span><ui-badge [type]="boxOk() ? 'success' : 'warning'" [pill]="true">{{ boxOk() ? 'Connectée' : 'À configurer' }}</ui-badge></li>
+          <li><span>Pièces</span><strong>{{ roomCount() }}</strong></li>
+          <li><span>Volets classés dans une pièce</span><strong>{{ placedCount() }} / {{ rows().length }}</strong></li>
+        </ul>
+        <p class="form-hint">Les volets classés sont déjà posés sur le plan : ouvrez-le, puis « Modifier » pour ajuster les pièces et déplacer les volets.</p>
+      }
+    }
+
+    <div class="actions">
+      @if (step() > 0 && step() < 5) {
+        <ui-button variant="ghost" icon="fa-solid fa-arrow-left" [disabled]="busy()" (clicked)="back()">Retour</ui-button>
+      }
+      <div class="actions__right">
+        @if (step() === 1 || step() === 2) {
+          <ui-button variant="ghost" [disabled]="busy()" (clicked)="skip()">Passer cette étape</ui-button>
+        }
+        @if (step() < 5) {
+          <ui-button variant="primary" [loading]="busy()" (clicked)="next()">
+            {{ step() === 1 ? 'Enregistrer et tester' : step() === 4 ? 'Enregistrer' : 'Suivant' }}
+          </ui-button>
+        } @else {
+          <ui-button variant="secondary" [disabled]="busy()" (clicked)="finish('/home')">Accueil</ui-button>
+          <ui-button variant="primary" icon="fa-solid fa-map" [loading]="busy()" (clicked)="finish('/plan')">Voir le plan</ui-button>
+        }
+      </div>
+    </div>
+  </div>
+</div>

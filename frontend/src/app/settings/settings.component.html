@@ -1,0 +1,417 @@
+<div class="settings-tabs" role="tablist" aria-label="Sections des paramètres">
+  @for (t of tabs; track t.id; let i = $index) {
+    <button type="button" class="settings-tab" role="tab" [id]="'tab-' + t.id" [attr.aria-selected]="tab === t.id" [attr.aria-controls]="'panel'"
+      [attr.tabindex]="tab === t.id ? 0 : -1" (click)="selectTab(t.id)" (keydown)="onTabKey($event, i)">
+      <i [class]="t.icon"></i> {{ t.label }}
+    </button>
+  }
+</div>
+
+<div class="settings-layout" id="panel" role="tabpanel" [attr.aria-labelledby]="'tab-' + tab" [attr.aria-busy]="loading">
+  @if (loadError) {
+    <ui-alert type="error">Impossible de charger cette section. <button type="button" class="link" (click)="retryTab()">Réessayer</button></ui-alert>
+  } @else if (loading) {
+    <ui-alert type="info">Chargement…</ui-alert>
+  }
+
+  @if (tab === 'box') {
+    <ui-card heading="Maison" icon="fa-solid fa-house">
+      <div class="form-group">
+        <label for="house-name">Nom de la maison</label>
+        <input id="house-name" type="text" maxlength="60" [(ngModel)]="houseName" (keyup.enter)="saveHouseName()" />
+      </div>
+      <div class="form-actions">
+        <ui-button variant="primary" icon="fa-solid fa-floppy-disk" [disabled]="!houseName.trim()" (clicked)="saveHouseName()">Enregistrer</ui-button>
+      </div>
+    </ui-card>
+
+    @if (boxConfig) {
+      <ui-card heading="Box Calyps'HOME" icon="fa-solid fa-network-wired">
+        <div class="info-rows">
+          <div class="info-row">
+            <span class="info-label">IP actuelle</span>
+            <ui-badge type="info" [pill]="true">{{ boxConfig.host }}</ui-badge>
+          </div>
+          @if (boxConfig.mac) {
+            <div class="info-row">
+              <span class="info-label">Adresse MAC</span>
+              <ui-badge type="info" [pill]="true">{{ boxConfig.mac }}</ui-badge>
+            </div>
+          }
+        </div>
+        <div class="config-form">
+          <div class="form-group">
+            <label for="box-host">Adresse IP</label>
+            <input
+              id="box-host"
+              type="text"
+              [(ngModel)]="boxHost"
+              placeholder="Ex: 192.168.1.50" />
+          </div>
+          <div class="form-group">
+            <label for="box-mac">Adresse MAC (optionnel)</label>
+            <input
+              id="box-mac"
+              type="text"
+              [(ngModel)]="boxMac"
+              placeholder="Ex: AA:BB:CC:DD:EE:FF" />
+          </div>
+          <div class="form-actions">
+            <ui-button
+              variant="primary"
+              icon="fa-solid fa-floppy-disk"
+              [disabled]="!boxHost"
+              (clicked)="saveBoxConfig()">
+              Enregistrer
+            </ui-button>
+            <div class="form-actions-divider"></div>
+            <ui-button
+              variant="ghost"
+              icon="fa-solid fa-wifi"
+              [disabled]="!boxHost"
+              (clicked)="testBoxPing()">
+              Tester la connexion
+            </ui-button>
+          </div>
+        </div>
+
+        @if (calypsCreds) {
+          <div class="config-form">
+            <div class="form-group">
+              <label for="creds-login">Identifiant</label>
+              <input
+                id="creds-login"
+                type="text"
+                [(ngModel)]="credsLogin"
+                placeholder="Identifiant Calyps'HOME"
+                autocomplete="username" />
+            </div>
+            <div class="form-group">
+              <label for="creds-password">Mot de passe</label>
+              <input
+                id="creds-password"
+                type="password"
+                [(ngModel)]="credsPassword"
+                [placeholder]="calypsCreds.password_set ? '(mot de passe existant — laisser vide pour conserver)' : 'Entrez le mot de passe'"
+                autocomplete="current-password" />
+            </div>
+            <div class="form-actions">
+              <ui-button
+                variant="primary"
+                icon="fa-solid fa-floppy-disk"
+                [disabled]="!credsLogin"
+                (clicked)="saveCalypsCreds()">
+                Enregistrer
+              </ui-button>
+              <div class="form-actions-divider"></div>
+              <ui-button
+                variant="ghost"
+                icon="fa-solid fa-key"
+                [disabled]="!credsLogin"
+                (clicked)="testBoxConnection()">
+                Tester les identifiants
+              </ui-button>
+            </div>
+          </div>
+        }
+        <div class="config-form">
+          <div class="form-group">
+            <label for="poll-interval">Intervalle de polling (secondes)</label>
+            <input id="poll-interval" type="number" min="10"
+              [(ngModel)]="pollInterval" placeholder="300" />
+          </div>
+          <div class="form-actions">
+            <ui-button
+              variant="primary"
+              icon="fa-solid fa-floppy-disk"
+              [disabled]="!pollInterval || pollInterval < 10"
+              (clicked)="savePollInterval()">
+              Enregistrer
+            </ui-button>
+          </div>
+        </div>
+      </ui-card>
+    }
+    @if (locationConfig) {
+      <ui-card heading="Localisation" icon="fa-solid fa-location-dot">
+        <div class="info-rows">
+          <div class="info-row">
+            <span class="info-label">Latitude</span>
+            <ui-badge type="info" [pill]="true">{{ locationConfig.latitude }}</ui-badge>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Longitude</span>
+            <ui-badge type="info" [pill]="true">{{ locationConfig.longitude }}</ui-badge>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Fuseau horaire</span>
+            <ui-badge type="info" [pill]="true">{{ locationConfig.timezone }}</ui-badge>
+          </div>
+          @if (sunTimes) {
+            <div class="info-row">
+              <span class="info-label">Soleil aujourd'hui</span>
+              <span>
+                <ui-badge type="info" [pill]="true">Lever {{ sunTimes.sunrise }}</ui-badge>
+                <ui-badge type="info" [pill]="true">Coucher {{ sunTimes.sunset }}</ui-badge>
+              </span>
+            </div>
+          }
+        </div>
+        <div class="config-form">
+          <div class="form-group">
+            <label for="loc-lat">Latitude</label>
+            <input id="loc-lat" type="number" step="0.0001" min="-90" max="90"
+              [(ngModel)]="latitude" placeholder="Ex: 48.8566" />
+          </div>
+          <div class="form-group">
+            <label for="loc-lon">Longitude</label>
+            <input id="loc-lon" type="number" step="0.0001" min="-180" max="180"
+              [(ngModel)]="longitude" placeholder="Ex: 2.3522" />
+          </div>
+          <div class="form-group">
+            <label for="loc-tz">Fuseau horaire</label>
+            <input id="loc-tz" type="text"
+              [(ngModel)]="timezone" placeholder="Ex: Europe/Paris" />
+          </div>
+          <div class="form-actions">
+            <ui-button
+              variant="primary"
+              icon="fa-solid fa-floppy-disk"
+              [disabled]="!timezone"
+              (clicked)="saveLocationConfig()">
+              Enregistrer
+            </ui-button>
+          </div>
+        </div>
+      </ui-card>
+    }
+  }
+
+  @if (tab === 'notifications') {
+    @if (config) {
+      <ui-card heading="Notifications" icon="fa-solid fa-bell">
+        <div class="info-rows">
+          <div class="info-row">
+            <span class="info-label">Canal actif</span>
+            <ui-badge type="info" [pill]="true">{{ config.channel }}</ui-badge>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Email</span>
+            <ui-badge [type]="config.email_enabled ? 'success' : 'warning'" [pill]="true">
+              {{ config.email_enabled ? 'Configuré' : 'Non configuré' }}
+            </ui-badge>
+          </div>
+          @if (!config.smtp_configured) {
+            <ui-alert type="warning">SMTP non configuré — les notifications email ne fonctionneront pas.</ui-alert>
+          }
+        </div>
+
+        <div class="config-form">
+          <div class="form-group">
+            <label for="channel-select">Canal de notification</label>
+            <select id="channel-select" [(ngModel)]="selectedChannel" (change)="saveChannel()">
+              <option value="none">Aucun</option>
+              <option value="email">Email</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="config-form">
+          <div class="form-actions">
+            <ui-button
+              variant="ghost"
+              icon="fa-solid fa-paper-plane"
+              [disabled]="config.channel === 'none'"
+              (clicked)="testNotification()">
+              Tester
+            </ui-button>
+          </div>
+        </div>
+      </ui-card>
+    }
+    @if (smtpConfig) {
+      <ui-card heading="Email (SMTP)" icon="fa-solid fa-envelope">
+        <div class="info-rows">
+          <div class="info-row">
+            <span class="info-label">Serveur SMTP</span>
+            <ui-badge [type]="smtpConfig.host ? 'success' : 'warning'" [pill]="true">
+              {{ smtpConfig.host || 'Non configuré' }}
+            </ui-badge>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Mot de passe</span>
+            <ui-badge [type]="smtpConfig.password_set ? 'success' : 'warning'" [pill]="true">
+              {{ smtpConfig.password_set ? 'Configuré' : 'Non configuré' }}
+            </ui-badge>
+          </div>
+        </div>
+        <div class="config-form">
+          <div class="form-group">
+            <label for="smtp-host">Serveur SMTP</label>
+            <input id="smtp-host" type="text"
+              [(ngModel)]="smtpHost" placeholder="Ex: smtp.exemple.com" />
+          </div>
+          <div class="form-group">
+            <label for="smtp-port">Port</label>
+            <input id="smtp-port" type="number"
+              [(ngModel)]="smtpPort" placeholder="587" />
+          </div>
+          <div class="form-group">
+            <label for="smtp-user">Utilisateur</label>
+            <input id="smtp-user" type="text"
+              [(ngModel)]="smtpUser" placeholder="Ex: mon@email.com" autocomplete="username" />
+          </div>
+          <div class="form-group">
+            <label for="smtp-password">Mot de passe</label>
+            <input id="smtp-password" type="password"
+              [(ngModel)]="smtpPassword"
+              [placeholder]="smtpConfig.password_set ? '(existant — laisser vide pour conserver)' : 'Mot de passe SMTP'"
+              autocomplete="current-password" />
+          </div>
+          <div class="form-group">
+            <label for="smtp-from">Expéditeur (From)</label>
+            <input id="smtp-from" type="email"
+              [(ngModel)]="smtpFrom" placeholder="Ex: noreply@mondomaine.com" />
+          </div>
+          <div class="form-group">
+            <label for="smtp-to">Destinataire (To)</label>
+            <input id="smtp-to" type="email"
+              [(ngModel)]="smtpEmailTo" placeholder="Ex: moi@email.com" />
+          </div>
+          <div class="form-actions">
+            <ui-button
+              variant="primary"
+              icon="fa-solid fa-floppy-disk"
+              [disabled]="!smtpHost"
+              (clicked)="saveSmtpConfig()">
+              Enregistrer
+            </ui-button>
+          </div>
+        </div>
+      </ui-card>
+    }
+  }
+
+  @if (tab === 'devices') {
+    <ui-card heading="Appareils Custom API" icon="fa-solid fa-microchip">
+      <div class="info-rows">
+        @for (dev of customDevices; track dev.id) {
+          <div class="info-row">
+            <div>
+              <strong>{{ dev.name }}</strong><br>
+              <small>{{ dev.extra_params?.url }}</small>
+            </div>
+            <ui-button variant="ghost" icon="fa-solid fa-trash" (clicked)="deleteCustomDevice(dev.db_id)"></ui-button>
+          </div>
+        }
+      </div>
+      <div class="config-form">
+        <div class="form-group">
+          <label for="custom-name">Nom de l'appareil</label>
+          <input id="custom-name" type="text" [(ngModel)]="newCustomName" placeholder="Ex: Lampe Salon" />
+        </div>
+        <div class="form-group">
+          <label for="custom-url">URL API (doit retourner JSON avec 'level')</label>
+          <input id="custom-url" type="text" [(ngModel)]="newCustomUrl" placeholder="http://192.168.1.x/api/state" />
+        </div>
+        <div class="form-group">
+          <label for="custom-type">Type</label>
+          <select id="custom-type" [(ngModel)]="newCustomType">
+            <option value="shutter">Volet / Lumière (0-100)</option>
+            <option value="sensor">Capteur</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <ui-button variant="primary" icon="fa-solid fa-plus" (clicked)="addCustomDevice()" [disabled]="!newCustomName || !newCustomUrl">
+            Ajouter l'appareil
+          </ui-button>
+        </div>
+      </div>
+    </ui-card>
+  }
+
+  @if (tab === 'security') {
+    <ui-card heading="Sécurité" icon="fa-solid fa-lock">
+      <div class="config-form">
+        <div class="form-group">
+          <label for="sec-current">Mot de passe actuel</label>
+          <input
+            id="sec-current"
+            type="password"
+            [(ngModel)]="currentPassword"
+            placeholder="Mot de passe actuel"
+            autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label for="sec-new">Nouveau mot de passe</label>
+          <input
+            id="sec-new"
+            type="password"
+            [(ngModel)]="newPassword"
+            placeholder="Nouveau mot de passe (8 caractères min.)"
+            autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label for="sec-confirm">Confirmer</label>
+          <input
+            id="sec-confirm"
+            type="password"
+            [(ngModel)]="confirmNewPassword"
+            placeholder="Confirmer le nouveau mot de passe"
+            autocomplete="new-password" />
+        </div>
+        <div class="form-actions">
+          <ui-button
+            variant="primary"
+            icon="fa-solid fa-key"
+            [disabled]="!currentPassword || !newPassword || !confirmNewPassword"
+            (clicked)="changePassword()">
+            Changer le mot de passe
+          </ui-button>
+        </div>
+      </div>
+    </ui-card>
+
+    <ui-card heading="Utilisateurs" icon="fa-solid fa-users">
+      <p class="hint">Ces comptes peuvent se connecter à l'application.</p>
+      <ul class="user-list">
+        @for (u of allowedUsers; track u) {
+          <li>
+            <span>{{ u }}</span>
+            <ui-button variant="ghost" size="sm" icon="fa-solid fa-trash" [disabled]="u === currentUser" (clicked)="removeUser(u)"
+              [title]="u === currentUser ? 'Vous ne pouvez pas supprimer votre propre compte' : 'Supprimer ' + u">Retirer</ui-button>
+          </li>
+        }
+      </ul>
+      <div class="config-form">
+        <div class="form-group">
+          <label for="new-user">Nom d'utilisateur</label>
+          <input id="new-user" type="text" [(ngModel)]="newUserName" placeholder="ex. camille" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="new-user-pw">Mot de passe</label>
+          <input id="new-user-pw" type="password" [(ngModel)]="newUserPassword" placeholder="8 caractères minimum" autocomplete="new-password" (keyup.enter)="addUser()" />
+        </div>
+        <div class="form-actions">
+          <ui-button variant="primary" icon="fa-solid fa-user-plus" [disabled]="!newUserName || !newUserPassword" (clicked)="addUser()">Ajouter</ui-button>
+        </div>
+      </div>
+    </ui-card>
+  }
+
+  @if (tab === 'about') {
+    <ui-card heading="À propos" icon="fa-solid fa-circle-info">
+      <div class="about-text">
+        <span>Cal-Home Alt — pilotage local de volets Calyps'HOME · licence MIT</span>
+        <span>Connecté en tant que <strong>{{ currentUser }}</strong></span>
+        <span><strong>Projet indépendant et bénévole</strong>, sans aucun lien avec Calyps'HOME / Calypshome ni Profalux, partagé sans but lucratif.
+          Aucune garantie : à vos risques et périls, l'auteur décline toute responsabilité. Ce n'est pas un dispositif de sécurité.</span>
+        <span>L'API de la box utilisée ici n'est ni officielle ni documentée par le fabricant. Le principe de dialogue avec la box vient du travail de
+          <a href="https://github.com/saniho/calypshome" target="_blank" rel="noopener noreferrer">saniho/calypshome</a>.</span>
+      </div>
+      <div class="form-actions" style="margin-top:1rem">
+        <a routerLink="/setup" class="ui-btn ui-btn--secondary ui-btn--sm"><i class="fa-solid fa-wand-magic-sparkles"></i> Relancer l'assistant de configuration</a>
+      </div>
+    </ui-card>
+  }
+</div>

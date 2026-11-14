@@ -1,0 +1,24 @@
+# Données de l'utilisateur (base SQLite, journaux) : ne jamais publier
+data/
+*.db
+*.log
+
+# Environnements et dépendances
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Éditeurs
+.idea/
+.vscode/
+.DS_Store
+
+# Configuration et données personnelles : ne jamais publier
+.env
+.env.*
+!.env.example
+tools/calyps_installer_profile.json

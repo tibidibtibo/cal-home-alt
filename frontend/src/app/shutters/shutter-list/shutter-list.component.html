@@ -1,0 +1,85 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Mes volets</h1>
+    @if (loaded && totalShutters > 0) {
+      <p class="subtitle">{{ totalShutters }} volets · {{ openCount }} ouverts · {{ closedCount }} fermés</p>
+    }
+  </div>
+  <div class="page-actions">
+    @if (lastPoll) {
+      <span class="last-poll" title="Dernière lecture de la box">Box lue à {{ lastPoll | date:'HH:mm:ss' }}</span>
+    }
+    <a routerLink="/shutter-config" class="config-link"><i class="fa-solid fa-sliders"></i> Configurer les volets</a>
+    <ui-button variant="secondary" icon="fa-solid fa-arrows-rotate" [disabled]="refreshing" (clicked)="onRefresh()">{{ refreshing ? 'Actualisation…' : 'Actualiser' }}</ui-button>
+    @if (confirmCloseAll) {
+      <span class="confirm-box" role="alertdialog" aria-label="Confirmer la fermeture de tous les volets">
+        Fermer tous les volets ?
+        <ui-button variant="warning" size="sm" (clicked)="onCloseAll()">Oui, fermer</ui-button>
+        <ui-button variant="ghost" size="sm" (clicked)="cancelCloseAll()">Annuler</ui-button>
+      </span>
+    } @else {
+      <ui-button variant="warning" icon="fa-solid fa-chevron-down" [disabled]="totalShutters === 0" (clicked)="onCloseAll()">Tout fermer</ui-button>
+    }
+  </div>
+</div>
+
+@if (!loaded) {
+  <div class="shutters-grid" aria-busy="true" aria-label="Chargement des volets">
+    @for (i of [1, 2, 3, 4]; track i) { <div class="skeleton"></div> }
+  </div>
+} @else if (totalShutters === 0 && sensors.length === 0) {
+  <div class="empty">
+    <i class="fa-solid fa-house-signal"></i>
+    <h2>Aucun volet détecté</h2>
+    <p>Vérifiez l'adresse et les identifiants de la box Calyps'HOME, puis actualisez.</p>
+    <a routerLink="/settings" class="link-btn">Ouvrir les paramètres</a>
+  </div>
+} @else {
+  @if (totalShutters > 0) {
+    <div class="toolbar">
+      <div class="filters" role="group" aria-label="Filtrer les volets">
+        <button type="button" [attr.aria-pressed]="filter === 'all'" (click)="setFilter('all')">Tous ({{ totalShutters }})</button>
+        <button type="button" [attr.aria-pressed]="filter === 'open'" (click)="setFilter('open')">Ouverts ({{ openCount }})</button>
+        <button type="button" [attr.aria-pressed]="filter === 'closed'" (click)="setFilter('closed')">Fermés ({{ closedCount }})</button>
+      </div>
+    </div>
+  }
+
+  @if (hasUnassigned && filter === 'all') {
+    <div class="hint">
+      <i class="fa-solid fa-circle-info"></i>
+      <span>Certains volets ne sont dans aucune pièce. Classez-les directement depuis leur carte, ou depuis
+        <a routerLink="/shutter-config">la configuration des volets</a>. Les pièces se créent dans <a routerLink="/plan">le plan</a>.</span>
+    </div>
+  }
+
+  @for (room of rooms; track room.name) {
+    <section class="room-section" [attr.aria-label]="room.name">
+      <div class="room-head">
+        <h2 class="room-title">{{ room.name }}<span class="count">({{ room.shutters.length }})</span></h2>
+        <div class="room-actions">
+          <button type="button" (click)="openRoom(room)" [attr.aria-label]="'Ouvrir tous les volets : ' + room.name"><i class="fa-solid fa-chevron-up"></i> Ouvrir</button>
+          <button type="button" (click)="closeRoom(room)" [attr.aria-label]="'Fermer tous les volets : ' + room.name"><i class="fa-solid fa-chevron-down"></i> Fermer</button>
+        </div>
+      </div>
+      <div class="shutters-grid">
+        @for (shutter of room.shutters; track shutter.id) {
+          <app-shutter-card [shutter]="shutter" [rooms]="room.unassigned ? roomOptions : []" (roomAssigned)="onAssign($event)"></app-shutter-card>
+        }
+      </div>
+    </section>
+  } @empty {
+    <p class="empty">Aucun volet ne correspond à ce filtre.</p>
+  }
+
+  @if (sensors.length > 0) {
+    <section class="room-section" aria-label="Capteurs">
+      <div class="room-head"><h2 class="room-title">Capteurs<span class="count">({{ sensors.length }})</span></h2></div>
+      <div class="sensors">
+        @for (s of sensors; track s.id) {
+          <span class="sensor">{{ s.name }} <ui-badge [type]="s.is_closed ? 'success' : 'warning'" [pill]="true">{{ s.is_closed ? 'Fermé' : 'Ouvert' }}</ui-badge></span>
+        }
+      </div>
+    </section>
+  }
+}

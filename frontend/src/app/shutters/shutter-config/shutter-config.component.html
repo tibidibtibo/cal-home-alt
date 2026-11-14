@@ -1,0 +1,202 @@
+<a routerLink="/list" class="back-link"><i class="fa-solid fa-arrow-left"></i> Retour aux volets</a>
+<div class="page-header">
+  <h1 class="page-title">Configuration des volets</h1>
+  @if (dissociatedConfigs.length > 0) {
+    <ui-button variant="ghost" size="sm" icon="fa-solid fa-eye{{ showDissociated ? '-slash' : '' }}"
+      (clicked)="showDissociated = !showDissociated">
+      {{ showDissociated ? 'Masquer' : 'Voir' }} équipements dissociés ({{ dissociatedConfigs.length }})
+    </ui-button>
+  }
+</div>
+
+@if (loaded && configs.length === 0) {
+  <ui-alert type="info">
+    Aucun volet configuré. Lancez un rafraîchissement depuis la page principale pour détecter les volets de la box.
+  </ui-alert>
+}
+
+<div class="configs-grid">
+  @for (c of associatedConfigs; track c.id) {
+    <ui-card [heading]="displayName(c)">
+      <div class="card-color-strip" [style.background]="c.color || 'transparent'"></div>
+      <div class="info-block">
+        <div class="info-row">
+          <span class="info-label">Nom API</span>
+          <span class="info-value">{{ c.api_name }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">ID API</span>
+          <span class="api-id-value">{{ c.api_id }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Pièce</span>
+          <span class="info-value">{{ roomName(c) }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Orientation</span>
+          <span class="info-value">{{ c.orientation }}° ({{ compassDirection(c.orientation) }})</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Mode soleil</span>
+          <span class="info-value">{{ c.sun_level ?? 25 }}%</span>
+        </div>
+        @if (c.p1_level != null || c.p2_level != null) {
+          <div class="info-row">
+            <span class="info-label">Favorites</span>
+            <span class="info-value">
+              @if (c.p1_level != null) { P1: {{ c.p1_level }}% }
+              @if (c.p1_level != null && c.p2_level != null) { · }
+              @if (c.p2_level != null) { P2: {{ c.p2_level }}% }
+            </span>
+          </div>
+        }
+      </div>
+
+      <div slot="footer" class="footer-actions">
+        <ui-button variant="secondary" size="sm" icon="fa-solid fa-pen" (clicked)="startEdit(c)">Modifier</ui-button>
+        <ui-button variant="ghost" size="sm" icon="fa-solid fa-link" (clicked)="openReassociate(c)">Ré-associer</ui-button>
+      </div>
+    </ui-card>
+  }
+</div>
+
+<!-- Dissociated shutters -->
+@if (showDissociated && dissociatedConfigs.length > 0) {
+  <div class="dissociated-section">
+    <p class="dissociated-label">Équipements dissociés — présents en base mais non détectés sur la box</p>
+    <div class="configs-grid">
+      @for (c of dissociatedConfigs; track c.id) {
+        <ui-card [heading]="displayName(c)">
+          <div class="card-color-strip" [style.background]="c.color || 'transparent'"></div>
+          <div class="info-block">
+            <div class="info-row">
+              <span class="info-label">Nom API</span>
+              <span class="info-value">{{ c.api_name }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">ID API</span>
+              <span class="api-id-value">{{ c.api_id }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Orientation</span>
+              <span class="info-value">{{ c.orientation }}° ({{ compassDirection(c.orientation) }})</span>
+            </div>
+          </div>
+          <div slot="footer" class="footer-actions">
+            <ui-button variant="secondary" size="sm" icon="fa-solid fa-pen" (clicked)="startEdit(c)">Modifier</ui-button>
+            <ui-button variant="ghost" size="sm" icon="fa-solid fa-link" (clicked)="openReassociate(c)">Ré-associer</ui-button>
+          </div>
+        </ui-card>
+      }
+    </div>
+  </div>
+}
+
+<!-- Edit modal -->
+@if (editingId !== null) {
+  <div class="modal-backdrop" (click)="cancelEdit()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <p class="modal-title">Modifier le volet</p>
+
+      <div class="edit-form">
+        <div class="form-group">
+          <label>Nom personnalisé</label>
+          <input type="text" [(ngModel)]="editName" [placeholder]="editApiName">
+        </div>
+
+        <div class="form-group">
+          <label>Pièce</label>
+          <select [(ngModel)]="editRoomId" class="room-select">
+            <option [ngValue]="null">Non assigné</option>
+            @for (r of rooms; track r.id) {
+              <option [ngValue]="r.id">{{ r.name }}{{ cardCount > 1 ? ' (' + r.card_name + ')' : '' }}</option>
+            }
+          </select>
+          @if (rooms.length === 0) {
+            <small style="color:var(--color-text-muted)">Aucune pièce : créez-en d'abord dans la vue Plan.</small>
+          }
+        </div>
+
+        <div class="form-group">
+          <label>Orientation — {{ editOrientation }}° ({{ compassDirection(editOrientation) }})</label>
+          <div class="compass-display">
+            <input type="range" [(ngModel)]="editOrientation" min="0" max="359" step="5" style="flex:1">
+            <input type="number" [(ngModel)]="editOrientation" min="0" max="359" step="5"
+                   style="width:4.5rem;padding:0.3rem 0.5rem;border:1px solid var(--color-border,#d1d5db);border-radius:var(--radius-md,0.5rem);font-size:0.9rem;font-family:inherit;background:var(--color-background);color:var(--color-text);text-align:center">
+            <span class="compass-label">{{ compassDirection(editOrientation) }}</span>
+          </div>
+          <small style="color:var(--color-text-muted)">Direction vers laquelle la fenêtre est exposée. 0°=N, 90°=E, 180°=S, 270°=O</small>
+        </div>
+
+        <div class="form-group">
+          <label>Mode soleil — {{ editSunLevel }}%</label>
+          <div class="compass-display">
+            <input type="range" [(ngModel)]="editSunLevel" min="0" max="100" step="1" style="flex:1">
+            <input type="number" [(ngModel)]="editSunLevel" min="0" max="100" step="1" class="pct-input">
+          </div>
+        </div>
+
+        <div class="favorites-row">
+          <div class="form-group" style="flex:1">
+            <label>Position favorite P1 (%)</label>
+            <div class="fav-input-row">
+              <input type="number" [(ngModel)]="editP1Level" min="0" max="100" step="1" placeholder="Non définie" class="pct-input" style="flex:1">
+              @if (editP1Level !== null) {
+                <button type="button" class="color-clear" (click)="editP1Level = null" title="Effacer P1">✕</button>
+              }
+            </div>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Position favorite P2 (%)</label>
+            <div class="fav-input-row">
+              <input type="number" [(ngModel)]="editP2Level" min="0" max="100" step="1" placeholder="Non définie" class="pct-input" style="flex:1">
+              @if (editP2Level !== null) {
+                <button type="button" class="color-clear" (click)="editP2Level = null" title="Effacer P2">✕</button>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Couleur</label>
+          <div class="color-picker-row">
+            <input type="color" [(ngModel)]="editColor" class="color-input">
+            <span class="color-value">{{ editColor }}</span>
+            <button class="color-clear" (click)="editColor = '#6366f1'" title="Réinitialiser">↺</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <ui-button variant="success" [loading]="saving" [disabled]="saving" (clicked)="saveEdit()">Enregistrer</ui-button>
+        <ui-button variant="ghost" [disabled]="saving" (clicked)="cancelEdit()">Annuler</ui-button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Reassociate modal -->
+@if (reassociateId !== null) {
+  <div class="modal-backdrop" (click)="reassociateId = null">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <p class="modal-title">Ré-associer à un volet de la box</p>
+      <small style="color:var(--color-text-muted)">Sélectionnez le volet détecté sur la box Calyps'HOME à associer à cet enregistrement.</small>
+      <div class="live-list">
+        @for (s of liveShutters; track s.id) {
+          <div class="live-item" [class.selected]="selectedApiId === s.api_id"
+               (click)="selectedApiId = s.api_id ?? null">
+            <span class="live-item-name">{{ s.name }}</span>
+            <span class="live-item-id">{{ s.api_id }}</span>
+          </div>
+        }
+        @if (liveShutters.length === 0) {
+          <p style="color:var(--color-text-muted);font-size:0.9rem">Aucun volet détecté. Vérifiez la connexion à la box.</p>
+        }
+      </div>
+      <div class="modal-actions">
+        <ui-button variant="primary" [disabled]="!selectedApiId" (clicked)="confirmReassociate()">Confirmer</ui-button>
+        <ui-button variant="ghost" (clicked)="reassociateId = null">Annuler</ui-button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,206 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Trafic &amp; Temps de réponse Box</h1>
+    <p class="subtitle">
+      Les requêtes vers la box Calyps'HOME sont sérialisées (1 seule connexion à la fois, espacées d'au moins {{ stats.min_interval_ms }} ms) pour éviter de saturer son serveur HTTP.
+    </p>
+  </div>
+  <div class="page-actions">
+    <ui-button variant="ghost" icon="fa-solid fa-trash-can" (clicked)="clearHistory()" [disabled]="history.length === 0 && stats.total_requests === 0">
+      Vider l'historique
+    </ui-button>
+    <ui-button variant="ghost" icon="fa-solid fa-rotate" (clicked)="refresh()" [disabled]="loading">
+      Rafraîchir
+    </ui-button>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">
+      <span>Requête en cours</span>
+      <ui-badge [type]="active ? (active.phase === 'http' ? 'info' : 'warning') : 'neutral'" [pill]="true">
+        {{ active ? (active.phase === 'http' ? 'HTTP en cours' : 'Anti-spam') : 'Au repos' }}
+      </ui-badge>
+    </div>
+    <div class="kpi-value">
+      @if (active) {
+        {{ active.elapsed_ms }} <small>ms</small>
+      } @else {
+        Aucune
+      }
+    </div>
+    <div class="kpi-sub">
+      @if (active) {
+        {{ formatOp(active.op) }} {{ active.target_name || active.target || '' }}
+      } @else {
+        Aucune connexion active vers la box
+      }
+    </div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-label">
+      <span>En attente</span>
+      <ui-badge [type]="queued.length > 0 ? 'warning' : 'success'" [pill]="true">
+        {{ queued.length > 0 ? queued.length + ' en file' : 'File vide' }}
+      </ui-badge>
+    </div>
+    <div class="kpi-value">{{ queued.length }}</div>
+    <div class="kpi-sub">Délai anti-spam : {{ stats.min_interval_ms }} ms min. entre 2 appels</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-label">
+      <span>Dernier temps de réponse</span>
+      <ui-badge [type]="getResponseBadgeType(stats.last_response_ms, stats.last_ok)" [pill]="true">
+        {{ getResponseLabel(stats.last_response_ms, stats.last_ok) }}
+      </ui-badge>
+    </div>
+    <div class="kpi-value">
+      @if (stats.last_response_ms !== null) {
+        {{ stats.last_response_ms }} <small>ms</small>
+      } @else {
+        —
+      }
+    </div>
+    <div class="kpi-sub">
+      Moy. : {{ stats.avg_response_ms !== null ? stats.avg_response_ms + ' ms' : '—' }}
+      · Min : {{ stats.min_response_ms !== null ? stats.min_response_ms + ' ms' : '—' }}
+      · Max : {{ stats.max_response_ms !== null ? stats.max_response_ms + ' ms' : '—' }}
+    </div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-label">
+      <span>Bilan des requêtes</span>
+      <ui-badge [type]="stats.total_errors > 0 ? 'error' : 'success'" [pill]="true">
+        {{ stats.total_errors }} erreur(s)
+      </ui-badge>
+    </div>
+    <div class="kpi-value">{{ stats.total_requests }}</div>
+    <div class="kpi-sub">{{ stats.total_requests - stats.total_errors }} réussie(s) depuis le démarrage</div>
+  </div>
+</div>
+
+<ui-card heading="Requête en cours &amp; File d'attente" icon="fa-solid fa-layer-group" class="section-gap">
+  @if (active) {
+    <div class="active-banner" data-testid="active-request">
+      <div class="active-main">
+        <span class="pulse-dot"></span>
+        <strong>#{{ active.id }} — {{ formatOp(active.op) }}</strong>
+        @if (active.target_name || active.target) {
+          <span class="mono">({{ active.target_name || active.target }})</span>
+        }
+        @if (active.args) {
+          <span class="mono muted">{{ active.args }}</span>
+        }
+        <ui-badge [type]="active.phase === 'http' ? 'info' : 'warning'" [pill]="true">
+          {{ active.phase === 'http' ? 'Requête HTTP en cours' : 'Temporisation anti-spam' }}
+        </ui-badge>
+      </div>
+      <div class="active-meta">
+        <span>Attente file : <strong>{{ active.wait_ms }} ms</strong></span>
+        <span>Durée écoulée : <strong>{{ active.elapsed_ms }} ms</strong></span>
+      </div>
+    </div>
+  }
+
+  @if (queued.length > 0) {
+    <div class="table-wrap">
+      <table class="traffic-table" data-testid="queued-table">
+        <thead>
+          <tr>
+            <th>Position</th>
+            <th>Opération</th>
+            <th>Cible / Paramètres</th>
+            <th>Mise en file</th>
+            <th>Temps d'attente</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of queued; track item.id; let idx = $index) {
+            <tr>
+              <td><ui-badge type="warning" [pill]="true">#{{ idx + 1 }}</ui-badge></td>
+              <td><strong>{{ formatOp(item.op) }}</strong></td>
+              <td>
+                <span>{{ item.target_name || item.target || '—' }}</span>
+                @if (item.args) {
+                  <span class="mono muted"> · {{ item.args }}</span>
+                }
+              </td>
+              <td class="muted">{{ formatTime(item.queued_at) }}</td>
+              <td><strong>{{ item.waiting_ms }} ms</strong></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (!active && queued.length === 0) {
+    <div class="idle-box" data-testid="queue-empty">
+      Aucune requête en cours ni en attente — la box est au repos.
+    </div>
+  }
+</ui-card>
+
+<ui-card heading="Historique récent &amp; Temps de réponse de la box" icon="fa-solid fa-stopwatch">
+  <div class="table-wrap">
+    <table class="traffic-table" data-testid="history-table">
+      <thead>
+        <tr>
+          <th>Heure</th>
+          <th>Opération</th>
+          <th>Cible / Paramètres</th>
+          <th>Attente file</th>
+          <th>Temps de réponse Box</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of history; track item.id) {
+          <tr>
+            <td class="muted">{{ formatTime(item.started_at) }}</td>
+            <td><strong>{{ formatOp(item.op) }}</strong></td>
+            <td>
+              <span>{{ item.target_name || item.target || '—' }}</span>
+              @if (item.args) {
+                <span class="mono muted"> · {{ item.args }}</span>
+              }
+              @if (item.error) {
+                <span class="error-text">{{ item.error }}</span>
+              }
+            </td>
+            <td class="muted">{{ item.wait_ms }} ms</td>
+            <td>
+              <div class="duration-cell">
+                <strong>{{ item.duration_ms }} ms</strong>
+                <div class="duration-bar-bg">
+                  <div
+                    class="duration-bar-fill"
+                    [class.duration-bar-fill--warn]="item.duration_ms >= 500 && item.duration_ms <= 1500"
+                    [class.duration-bar-fill--err]="!item.ok || item.duration_ms > 1500"
+                    [style.width.%]="getBarWidth(item.duration_ms)">
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <ui-badge [type]="item.ok ? 'success' : 'error'" [pill]="true">
+                {{ item.ok ? 'OK' : 'Erreur' }}
+              </ui-badge>
+            </td>
+          </tr>
+        }
+        @if (history.length === 0) {
+          <tr>
+            <td colspan="6" style="text-align: center; padding: 2rem; color: var(--color-text-muted);">
+              Aucune requête enregistrée pour le moment.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</ui-card>

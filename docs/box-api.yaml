@@ -1,0 +1,361 @@
+openapi: "3.1.0"
+
+info:
+  title: Calyps'HOME Box API
+  version: "1.0"
+  description: |
+    **Documentation non officielle**, établie par observation du comportement de la box sur le réseau local ; sans lien avec le fabricant (Calyps'HOME / Profalux),
+    sans garantie d'exactitude, susceptible de changer à tout moment. À vos risques et périls — voir DISCLAIMER.md.
+
+    API HTTP de la box domotique Calyps'HOME.
+    Tous les appels passent par `POST /m` avec un paramètre `a` qui sélectionne l'action.
+    Authentification par cookies : `_server`, `_login`, `_password`.
+
+servers:
+  - url: "http://192.168.1.50"
+    description: Box locale (IP à adapter)
+
+security:
+  - cookieAuth: []
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: _login
+      description: |
+        Trois cookies requis simultanément :
+        - `_server` : URL base de la box (ex: `http://192.168.1.50`)
+        - `_login`  : email du compte (ex: `user@example.com`)
+        - `_password` : mot de passe
+
+  schemas:
+    StatusItem:
+      type: object
+      description: Champ clé/valeur retourné dans le tableau `status` d'un objet.
+      required: [name, value, time]
+      properties:
+        name:
+          type: string
+          description: Nom du champ.
+          examples:
+            - status
+            - level
+            - __user_name
+            - object_owner
+            - object_present
+            - object_id
+            - manufacturer_name
+            - alert_message
+            - present
+            - object_actions
+            - product_name
+            - __level_hemstitched
+        value:
+          type: string
+          description: Valeur sous forme de chaîne, même pour les numériques.
+          examples:
+            - "middle"
+            - "38"
+            - "Profalux"
+        time:
+          type: string
+          description: Horodatage de la dernière mise à jour (format `ctime` POSIX avec `\n` final).
+          example: "Sat May 23 12:49:59 2026\n"
+
+    ActionInfo:
+      type: object
+      required: [importance, args]
+      properties:
+        importance:
+          type: string
+          example: "0"
+        args:
+          type: boolean
+          description: "`true` si l'action accepte des arguments (ex: LEVEL, TILT)."
+
+    Room:
+      type: object
+      required: [name, id]
+      properties:
+        name:
+          type: string
+          example: Home
+        id:
+          type: integer
+          example: 1
+
+    StatusImages:
+      type: object
+      description: Mapping état → image SVG.
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: string
+      example:
+        status:
+          down: shutterObject_down.svg
+          middle: shutterObject_middle.svg
+          up: shutterObject_up.svg
+
+    RollingShutter:
+      type: object
+      required: [id, name, type, connected, status, actions]
+      properties:
+        id:
+          type: string
+          description: |
+            Identifiant complet du périphérique Zigbee.
+            Format : `atm_io_ezsp::<device-path>`.
+          example: "atm_io_ezsp::dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1"
+        name:
+          type: string
+          description: Nom lisible du volet.
+          example: "F Ch parents"
+        type:
+          type: string
+          enum: [Rolling_Shutter]
+        img:
+          type: string
+          description: Nom du fichier SVG représentant l'objet.
+          example: shutterObject.svg
+        gw:
+          type: string
+          description: Identifiant de la gateway.
+          example: WYAPES2L7LXIB4574BW4BDT3
+        gw_id:
+          type: string
+          example: ""
+        eventId:
+          type: string
+          description: Topic d'événements associé au périphérique.
+          example: "event/io/ezsp/dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1/"
+        connected:
+          type: boolean
+          example: true
+        categories:
+          type: array
+          items:
+            type: string
+          example: []
+        room:
+          $ref: "#/components/schemas/Room"
+        status:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusItem"
+          description: |
+            Tableau de champs d'état. Champs observés sur volets Profalux Zigbee :
+            | `name`               | Description                               |
+            |----------------------|-------------------------------------------|
+            | `status`             | Position : `open`, `middle`, `close`      |
+            | `level`              | Niveau d'ouverture 0–100 (string)         |
+            | `__level_hemstitched`| Copie interne du niveau                   |
+            | `object_owner`       | Driver propriétaire (ex: `atm_io_ezsp`)   |
+            | `object_id`          | Chemin device Zigbee brut                 |
+            | `manufacturer_name`  | Fabricant (ex: `Profalux`)                |
+            | `product_name`       | Modèle produit                            |
+            | `object_present`     | `"1"` si présent sur le réseau            |
+            | `present`            | Idem (champ redondant)                    |
+            | `alert_message`      | Message d'alerte éventuel (vide si OK)    |
+            | `object_actions`     | Actions brutes encodées `pipe-separated`  |
+            | `__user_name`        | Nom donné par l'utilisateur               |
+        actions:
+          type: array
+          items:
+            type: string
+            enum: [OPEN, CLOSE, STOP, LEVEL, TILT]
+          example: [OPEN, CLOSE, STOP, LEVEL]
+        actions_infos:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ActionInfo"
+          example:
+            OPEN:  {importance: "0", args: false}
+            CLOSE: {importance: "0", args: false}
+            STOP:  {importance: "0", args: false}
+            LEVEL: {importance: "0", args: true}
+        statusImages:
+          $ref: "#/components/schemas/StatusImages"
+
+    GetObjectsResponse:
+      type: object
+      required: [objects]
+      properties:
+        objects:
+          type: array
+          items:
+            $ref: "#/components/schemas/RollingShutter"
+          description: Liste de tous les objets domotiques de la box.
+
+    CommandArgs:
+      type: object
+      description: |
+        Arguments optionnels de la commande, sérialisés en JSON string dans le champ `args`.
+
+        | Action | Champ       | Type   | Plage  |
+        |--------|-------------|--------|--------|
+        | LEVEL  | `level`     | string | "0"–"100" |
+        | TILT   | `angle`     | string | "0"–"180" |
+
+      oneOf:
+        - title: LEVEL args
+          properties:
+            level:
+              type: string
+              pattern: "^(100|[0-9]{1,2})$"
+              example: "50"
+        - title: TILT args
+          properties:
+            angle:
+              type: string
+              pattern: "^(180|1[0-7][0-9]|[0-9]{1,2})$"
+              example: "45"
+
+paths:
+  /m:
+    post:
+      summary: Point d'entrée unique de l'API box
+      description: |
+        Toutes les opérations passent par ce endpoint. Le paramètre de requête `a`
+        sélectionne l'action à exécuter.
+
+        | `a`          | Corps                     | Description                     |
+        |--------------|---------------------------|---------------------------------|
+        | `getObjects` | vide                      | Récupère tous les objets        |
+        | `command`    | `application/x-www-form-urlencoded` | Envoie une commande |
+      operationId: postAction
+      parameters:
+        - name: a
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [getObjects, command]
+          description: Action à exécuter.
+      requestBody:
+        description: |
+          **Requis uniquement pour `a=command`.**
+          Corps `application/x-www-form-urlencoded` avec les champs ci-dessous.
+          Pour `a=getObjects`, ne pas envoyer de corps.
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [id, action]
+              properties:
+                id:
+                  type: string
+                  description: |
+                    Identifiant complet du périphérique cible
+                    (champ `id` retourné par `getObjects`).
+                  example: "atm_io_ezsp::dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1"
+                action:
+                  type: string
+                  enum: [OPEN, CLOSE, STOP, LEVEL, TILT]
+                  description: Action à exécuter sur le périphérique.
+                args:
+                  type: string
+                  description: |
+                    Arguments JSON sérialisés en string.
+                    Obligatoire pour LEVEL et TILT, vide sinon.
+                  examples:
+                    level50:
+                      summary: Régler niveau à 50%
+                      value: '{"level":"50"}'
+                    tilt45:
+                      summary: Incliner lames à 45°
+                      value: '{"angle":"45"}'
+                    empty:
+                      summary: Sans argument (OPEN/CLOSE/STOP)
+                      value: ""
+            examples:
+              open:
+                summary: Ouvrir un volet
+                value:
+                  id: "atm_io_ezsp::dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1"
+                  action: OPEN
+                  args: ""
+              close:
+                summary: Fermer un volet
+                value:
+                  id: "atm_io_ezsp::dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1"
+                  action: CLOSE
+                  args: ""
+              stop:
+                summary: Stopper un volet
+                value:
+                  id: "atm_io_ezsp::dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1"
+                  action: STOP
+                  args: ""
+              level:
+                summary: Régler niveau à 75%
+                value:
+                  id: "atm_io_ezsp::dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1"
+                  action: LEVEL
+                  args: '{"level":"75"}'
+              tilt:
+                summary: Incliner lames BSO à 90°
+                value:
+                  id: "atm_io_ezsp::dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1"
+                  action: TILT
+                  args: '{"angle":"90"}'
+      responses:
+        "200":
+          description: |
+            Succès. Le corps de la réponse dépend de l'action.
+
+            - **`a=getObjects`** : JSON avec la liste des objets domotiques.
+            - **`a=command`** : Corps variable (parfois vide, parfois JSON `{}`).
+              Se fier uniquement au code HTTP 200 pour confirmer la réception.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/GetObjectsResponse"
+                  - type: object
+                    description: Réponse vide ou minimale pour les commandes.
+              examples:
+                getObjects:
+                  summary: Réponse getObjects (extrait — 1 volet sur 7)
+                  value:
+                    objects:
+                      - id: "atm_io_ezsp::dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1"
+                        name: "F Ch parents"
+                        type: Rolling_Shutter
+                        img: shutterObject.svg
+                        gw: WYAPES2L7LXIB4574BW4BDT3
+                        gw_id: ""
+                        eventId: "event/io/ezsp/dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1/"
+                        connected: true
+                        categories: []
+                        room: {name: Home, id: 1}
+                        actions: [OPEN, CLOSE, STOP, LEVEL]
+                        actions_infos:
+                          OPEN:  {importance: "0", args: false}
+                          CLOSE: {importance: "0", args: false}
+                          STOP:  {importance: "0", args: false}
+                          LEVEL: {importance: "0", args: true}
+                        statusImages:
+                          status:
+                            down: shutterObject_down.svg
+                            middle: shutterObject_middle.svg
+                            up: shutterObject_up.svg
+                        status:
+                          - {name: status,             value: middle, time: "Sat May 23 12:49:59 2026\n"}
+                          - {name: level,              value: "38",   time: "Sat May 23 12:50:11 2026\n"}
+                          - {name: __level_hemstitched,value: "38",   time: "Sat May 23 12:50:11 2026\n"}
+                          - {name: __user_name,        value: "F Ch parents", time: "Mon May 18 06:32:47 2026\n"}
+                          - {name: object_owner,       value: atm_io_ezsp,    time: "Mon May 18 06:32:47 2026\n"}
+                          - {name: manufacturer_name,  value: Profalux,       time: "Mon May 18 06:32:47 2026\n"}
+                          - {name: product_name,       value: "-",            time: "Mon May 18 06:32:47 2026\n"}
+                          - {name: object_present,     value: "1",            time: "Mon May 18 06:32:47 2026\n"}
+                          - {name: present,            value: "1",            time: "Mon May 18 06:32:47 2026\n"}
+                          - {name: alert_message,      value: "",             time: "Mon May 18 06:32:47 2026\n"}
+                          - {name: object_id,          value: "dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1", time: "Mon May 18 06:32:47 2026\n"}
+                          - {name: object_actions,     value: "0|OPEN|action|device=dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1|value=up\n0|CLOSE|action|device=dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1|action=down\n0|STOP|action|device=dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1|action=stop\n0|LEVEL|set_level|device=dev-0/IEEEAddr-00-11-22-33-44-55-66-77:cluster-closure:endpoint-in_1|!level=INT,0,100", time: "Mon May 18 06:32:47 2026\n"}
+        "401":
+          description: Cookies d'authentification absents ou invalides.
+        "500":
+          description: Erreur interne de la box.

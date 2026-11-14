@@ -1,0 +1,234 @@
+<ui-card [heading]="schedule ? 'Modifier la règle' : 'Nouvelle règle'" icon="fa-solid fa-clock">
+  <div class="step-indicator">
+    <ui-badge [type]="step === 1 ? 'primary' : 'neutral'" [pill]="true">1. Général</ui-badge>
+    <ui-badge [type]="step === 2 ? 'primary' : 'neutral'" [pill]="true">2. Paramètres</ui-badge>
+    <ui-badge [type]="step === 3 ? 'primary' : 'neutral'" [pill]="true">3. Confirmation</ui-badge>
+  </div>
+
+  <form [formGroup]="form">
+    @if (step === 1) {
+      <div class="form-step">
+        <div class="field">
+          <label for="rule-name">Nom de la règle</label>
+          <input id="rule-name" type="text" formControlName="name" placeholder="Ex : Matin semaine">
+        </div>
+
+        <div class="field">
+          <label for="rule-mode">Mode de fonctionnement</label>
+          <select id="rule-mode" formControlName="mode">
+            <option value="fixed">Horaire fixe</option>
+            <option value="presence">Lever / coucher du soleil</option>
+            <option value="absence">Simulation de présence (absence)</option>
+            <option value="solar">Protection solaire (BSO)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Appareils</label>
+          @if (form.value.mode === 'absence') {
+            <small style="color:var(--color-text-muted)">Sélectionnez les volets à animer pendant l'absence ; décochez ceux à exclure (ex : cuisine).</small>
+          }
+          <div class="shutter-actions">
+            <button type="button" (click)="selectAllShutters()">Tout sélectionner</button>
+            <button type="button" (click)="clearShutters()">Aucun</button>
+          </div>
+          <div class="shutter-grid">
+            @for (group of devicesByType; track group.type) {
+              <div class="bso-section-label" style="grid-column: 1 / -1; margin-bottom: 0.5rem;">{{ group.type }}</div>
+              @for (s of group.devices; track s.id) {
+                <label class="shutter-check">
+                  <input type="checkbox"
+                    [checked]="form.value.device_ids.includes(s.id)"
+                    (change)="toggleShutter(s.id)">
+                  <span>
+                    <span class="shutter-name">{{ s.name }}</span>
+                    @if (s.room_id) {
+                      <span class="shutter-room"> — Pièce #{{ s.room_id }}</span>
+                    }
+                  </span>
+                </label>
+              }
+            }
+          </div>
+        </div>
+
+        @if (form.value.mode !== 'solar' && form.value.mode !== 'absence') {
+          <div class="field">
+            <label>Action</label>
+            <div class="action-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              @for (act of availableActions; track act.value) {
+                <ui-button type="button"
+                  [variant]="form.value.action === act.value ? 'primary' : 'secondary'"
+                  (clicked)="form.patchValue({action: act.value})">
+                  {{ act.label }}
+                </ui-button>
+              }
+            </div>
+            @if (form.value.action === 'level') {
+              <div class="level-row">
+                <input type="range" formControlName="level" min="0" max="100">
+                <span class="level-value">{{ form.value.level }}%</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    @if (step === 2) {
+      <div class="form-step">
+        @if (form.value.mode === 'fixed') {
+          <div class="field">
+            <label for="rule-time">Heure d'exécution</label>
+            <input id="rule-time" type="time" formControlName="time">
+          </div>
+          <div class="field">
+            <label>Jours de la semaine</label>
+            <div class="day-buttons">
+              @for (label of dayLabels; track $index) {
+                <button type="button" class="day-btn"
+                  [class.active]="form.value.days.includes($index + 1)"
+                  (click)="toggleDay($index + 1)">{{ label }}</button>
+              }
+            </div>
+          </div>
+        }
+        @if (form.value.mode === 'presence') {
+          <div class="field">
+            <label for="rule-sun">Événement solaire</label>
+            <select id="rule-sun" formControlName="sun_event">
+              <option value="sunrise">Lever du soleil</option>
+              <option value="sunset">Coucher du soleil</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="rule-offset-dir">Moment</label>
+            <select id="rule-offset-dir" formControlName="offset_dir">
+              <option value="at">À l'heure exacte</option>
+              <option value="before">Avant</option>
+              <option value="after">Après</option>
+            </select>
+          </div>
+          @if (form.value.offset_dir !== 'at') {
+            <div class="field">
+              <label for="rule-offset">Décalage (minutes)</label>
+              <input id="rule-offset" type="number" formControlName="offset_abs" min="0" max="720" step="5">
+            </div>
+          }
+          @if (presencePreview) {
+            <ui-alert type="info">
+              Aujourd'hui : {{ form.value.sun_event === 'sunset' ? 'coucher' : 'lever' }} à
+              {{ form.value.sun_event === 'sunset' ? sunTimes?.sunset : sunTimes?.sunrise }}
+              → exécution à <strong>{{ presencePreview }}</strong> ({{ offsetLabel }}).
+              L'heure est recalculée chaque jour.
+            </ui-alert>
+          }
+        }
+        @if (form.value.mode === 'absence') {
+          <div class="field">
+            <label for="abs-open-weekday">Ouverture en semaine</label>
+            <input id="abs-open-weekday" type="time" formControlName="open_weekday">
+          </div>
+          <div class="field">
+            <label for="abs-open-weekend">Ouverture le week-end et les jours fériés</label>
+            <input id="abs-open-weekend" type="time" formControlName="open_weekend">
+          </div>
+          <div class="field">
+            <label for="abs-close-offset">Fermeture : minutes après le coucher du soleil</label>
+            <input id="abs-close-offset" type="number" formControlName="close_offset_min" min="-720" max="720" step="5">
+            <small style="color:var(--color-text-muted)">Valeur négative = avant le coucher. Fermeture chaque jour, ouverture à l'heure du type de jour.</small>
+          </div>
+          @if (absencePreview; as p) {
+            <ui-alert type="info">
+              Aujourd'hui ({{ p.dayLabel }}) : ouverture à <strong>{{ p.open }}</strong>,
+              fermeture à <strong>{{ p.close }}</strong>. Heures recalculées chaque jour.
+            </ui-alert>
+          }
+        }
+        @if (form.value.mode === 'solar') {
+          <ui-alert type="info" style="margin-bottom:0.5rem">
+            L'orientation est configurée par volet dans la page <strong>Configuration des volets</strong>.
+          </ui-alert>
+          <div class="field">
+            <label>Demi-angle d'exposition — ± {{ form.value.half_angle }}° (arc total {{ form.value.half_angle * 2 }}°)</label>
+            <input type="range" formControlName="half_angle" min="15" max="90" step="5">
+          </div>
+          <div class="field">
+            <label>Élévation solaire minimale — {{ form.value.altitude_min_bso }}°</label>
+            <input type="range" formControlName="altitude_min_bso" min="0" max="45" step="1">
+            <small style="color:var(--color-text-muted)">BSO actif uniquement si le soleil est au-dessus de ce seuil</small>
+          </div>
+          <div class="field">
+            <label>Niveau BSO (fermé) — {{ form.value.close_level }}%</label>
+            <input type="range" formControlName="close_level" min="0" max="100">
+          </div>
+          <div class="field">
+            <label>Niveau repos (ouvert) — {{ form.value.open_level }}%</label>
+            <input type="range" formControlName="open_level" min="0" max="100">
+          </div>
+          <p class="bso-section-label">Corrections temporaires</p>
+          <div class="field correction-field">
+            <label>Correction azimut — {{ form.value.azimuth_offset > 0 ? '+' : '' }}{{ form.value.azimuth_offset }}°</label>
+            <input type="range" formControlName="azimuth_offset" min="-45" max="45" step="1">
+          </div>
+          <div class="field correction-field">
+            <label>Correction élévation — {{ form.value.altitude_offset > 0 ? '+' : '' }}{{ form.value.altitude_offset }}°</label>
+            <input type="range" formControlName="altitude_offset" min="-15" max="15" step="1">
+          </div>
+        }
+      </div>
+    }
+
+    @if (step === 3) {
+      <div class="form-step">
+        <div class="summary-block">
+          <span><strong>Nom :</strong> {{ form.value.name }}</span>
+          <span><strong>Mode :</strong> {{ modeName }}</span>
+          <span>
+            <strong>Appareils :</strong> {{ form.value.device_ids.length }} sélectionné(s)
+            <div class="summary-shutter-list">{{ selectedShutterNames }}</div>
+          </span>
+          @if (form.value.mode === 'presence') {
+            <span><strong>Déclencheur :</strong> {{ form.value.sun_event === 'sunset' ? 'Coucher' : 'Lever' }} du soleil, {{ offsetLabel }}@if (presencePreview) { (aujourd'hui {{ presencePreview }}) }</span>
+          }
+          @if (form.value.mode === 'absence') {
+            <span><strong>Ouverture :</strong> {{ form.value.open_weekday }} en semaine, {{ form.value.open_weekend }} le week-end et jours fériés</span>
+            <span><strong>Fermeture :</strong> {{ closeOffsetLabel }}</span>
+          }
+          @if (form.value.mode === 'solar') {
+            <span><strong>Arc d'exposition :</strong> ± {{ form.value.half_angle }}° (orientation par volet)</span>
+            <span><strong>Élévation min :</strong> {{ form.value.altitude_min_bso }}°</span>
+            <span><strong>Niveaux :</strong> BSO {{ form.value.close_level }}% / Repos {{ form.value.open_level }}%</span>
+            @if (form.value.azimuth_offset !== 0 || form.value.altitude_offset !== 0) {
+              <span><strong>Corrections :</strong> azimut {{ form.value.azimuth_offset > 0 ? '+' : '' }}{{ form.value.azimuth_offset }}°, élévation {{ form.value.altitude_offset > 0 ? '+' : '' }}{{ form.value.altitude_offset }}°</span>
+            }
+          } @else if (form.value.mode !== 'absence') {
+            <span><strong>Action :</strong> {{ form.value.action }}{{ form.value.action === 'level' ? ' — ' + form.value.level + '%' : '' }}</span>
+          }
+        </div>
+        @if (conflicts.length > 0) {
+          <ui-alert type="warning" title="Conflits détectés !">
+            <ul class="conflict-list">
+              @for (c of conflicts; track c.device_id) {
+                <li>{{ c.description }} (Appareil #{{ c.device_id }})</li>
+              }
+            </ul>
+          </ui-alert>
+        } @else {
+          <ui-alert type="success">Aucun conflit détecté.</ui-alert>
+        }
+      </div>
+    }
+  </form>
+
+  <div slot="footer">
+    <ui-button variant="secondary" [disabled]="step === 1" (clicked)="prevStep()">Précédent</ui-button>
+    @if (step < 3) {
+      <ui-button variant="primary" [disabled]="!isStepValid" (clicked)="nextStep()">Suivant</ui-button>
+    }
+    @if (step === 3) {
+      <ui-button variant="success" (clicked)="save()">Enregistrer</ui-button>
+    }
+    <ui-button variant="ghost" (clicked)="cancel.emit()">Annuler</ui-button>
+  </div>
+</ui-card>

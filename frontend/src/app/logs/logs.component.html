@@ -1,0 +1,68 @@
+<ui-card heading="Logs Système" icon="fa-solid fa-list-ul">
+  <div class="filters">
+    <div class="filter-group">
+      <label for="level-filter">Niveau :</label>
+      <select id="level-filter" [(ngModel)]="levelFilter" (change)="applyFilter()">
+        <option value="ALL">Tous</option>
+        <option value="INFO">INFO</option>
+        <option value="WARNING">WARNING</option>
+        <option value="ERROR">ERROR</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="page-size">Par page :</label>
+      <select id="page-size" [(ngModel)]="pageSize" (change)="applyFilter()">
+        <option [ngValue]="25">25</option>
+        <option [ngValue]="50">50</option>
+        <option [ngValue]="100">100</option>
+      </select>
+    </div>
+    <ui-button variant="ghost" icon="fa-solid fa-sync" (clicked)="loadLogs()" [disabled]="loading">
+      Rafraîchir
+    </ui-button>
+  </div>
+
+  <div class="logs-table-wrap">
+    <table class="logs-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Niveau</th>
+          <th>Source</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (log of logs; track $index) {
+          <tr>
+            <td class="timestamp">{{ formatTs(log.ts) }}</td>
+            <td>
+              <ui-badge [type]="getBadgeType(log.level)" [pill]="true" class="level-badge">
+                {{ log.level }}
+              </ui-badge>
+            </td>
+            <td class="logger">{{ log.logger }}</td>
+            <td class="msg">{{ log.msg }}</td>
+          </tr>
+        }
+        @if (logs.length === 0 && !loading) {
+          <tr>
+            <td colspan="4" style="text-align: center; padding: 2rem; color: var(--color-text-muted);">
+              Aucun log trouvé.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pager">
+    <span class="pager-info">{{ total }} entrée(s) — page {{ page }} / {{ totalPages }}</span>
+    <ui-button variant="ghost" icon="fa-solid fa-angle-left" (clicked)="goTo(page - 1)" [disabled]="loading || page <= 1">
+      Précédent
+    </ui-button>
+    <ui-button variant="ghost" icon="fa-solid fa-angle-right" (clicked)="goTo(page + 1)" [disabled]="loading || page >= totalPages">
+      Suivant
+    </ui-button>
+  </div>
+</ui-card>

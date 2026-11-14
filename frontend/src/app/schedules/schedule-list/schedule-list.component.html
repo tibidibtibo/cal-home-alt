@@ -1,0 +1,103 @@
+<div class="page-header">
+  <h1 class="page-title">Automatisations</h1>
+  <ui-button variant="primary" icon="fa-solid fa-plus" (clicked)="openForm()">Nouvelle règle</ui-button>
+</div>
+
+@if (showForm) {
+  <div class="form-section">
+    <app-schedule-form
+      [schedule]="editingSchedule"
+      (cancel)="showForm = false"
+      (saved)="onFormSaved()">
+    </app-schedule-form>
+  </div>
+}
+
+@if (conflicts$ | async; as conflicts) {
+  <div class="conflicts-section">
+    <app-schedule-conflict [conflicts]="conflicts"></app-schedule-conflict>
+  </div>
+}
+
+<div class="plan-section">
+  <app-day-plan></app-day-plan>
+</div>
+
+@if (schedules$ | async; as schedules) {
+  <div class="schedules-grid">
+    @for (s of schedules; track s.id) {
+      <ui-card [heading]="s.name">
+        <div class="info-block">
+          <div class="info-row">
+            <span class="info-label">Mode</span>
+            <ui-badge type="info" [pill]="true">{{ getModeLabel(s.mode) }}</ui-badge>
+          </div>
+          @if (s.mode !== 'absence') {
+          <div class="info-row">
+            <span class="info-label">Action</span>
+            <span class="info-value">{{ getActionLabel(s) }}</span>
+          </div>
+          }
+
+          @if (s.mode === 'fixed') {
+            <div class="info-row">
+              <span class="info-label">Heure</span>
+              <span class="info-value">{{ s.params?.time }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Jours</span>
+              <span class="info-value">{{ getDaysLabel(s.params?.days) }}</span>
+            </div>
+          }
+          @if (s.mode === 'absence') {
+            <div class="info-row">
+              <span class="info-label">Ouverture</span>
+              <span class="info-value">{{ s.params?.open_weekday }} (sem.) · {{ s.params?.open_weekend }} (week-end/férié)</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Fermeture</span>
+              <span class="info-value">Coucher {{ s.params?.close_offset_min > 0 ? '+' : '' }}{{ s.params?.close_offset_min || 0 }} min</span>
+            </div>
+          }
+          @if (s.mode === 'presence') {
+            <div class="info-row">
+              <span class="info-label">Événement</span>
+              <span class="info-value">{{ s.params?.sun_event === 'sunrise' ? 'Lever' : 'Coucher' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Décalage</span>
+              <span class="info-value">{{ s.params?.offset_min > 0 ? '+' : '' }}{{ s.params?.offset_min || 0 }} min</span>
+            </div>
+          }
+          @if (s.mode === 'solar') {
+            <div class="info-row">
+              <span class="info-label">Arc ±</span>
+              <span class="info-value">{{ s.params?.half_angle }}°</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Élév. min</span>
+              <span class="info-value">{{ s.params?.altitude_min }}°</span>
+            </div>
+          }
+          <div class="info-row">
+            <span class="info-label">Volets</span>
+            <span class="info-value">{{ s.device_ids.length }} volet(s)</span>
+          </div>
+        </div>
+
+        <div slot="footer" class="action-block">
+          <div class="main-actions">
+            <ui-button variant="secondary" size="sm" icon="fa-solid fa-pen" (clicked)="openForm(s)" title="Modifier"></ui-button>
+            <ui-button variant="error" size="sm" icon="fa-solid fa-trash" (clicked)="delete(s.id)" title="Supprimer"></ui-button>
+          </div>
+          <div class="toggle-action">
+            <ui-button [variant]="s.enabled ? 'success' : 'secondary'" size="sm" (clicked)="toggle(s)">
+              {{ s.enabled ? 'Actif' : 'Inactif' }}
+            </ui-button>
+          </div>
+        </div>
+      </ui-card>
+    }
+  </div>
+}
+

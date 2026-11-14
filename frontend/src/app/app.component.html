@@ -1,0 +1,28 @@
+@if (!isLoginRoute) {
+  <app-header [appName]="appName" [nav]="navItems" [user]="user" (logout)="authService.logout()" />
+}
+
+@if (!isLoginRoute && authService.isAuthenticated()) {
+  @if (status$ | async; as s) {
+    @if (s.boxReachable === false) {
+      <div class="status-bar status-bar--error" role="alert">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>La box Calyps'HOME est injoignable. Les commandes sont suspendues
+          @if (s.lastPoll) { — dernier état connu à {{ s.lastPoll | date:'HH:mm' }} }.</span>
+      </div>
+    } @else if (s.failed) {
+      <div class="status-bar status-bar--warn" role="status">
+        <i class="fa-solid fa-plug-circle-exclamation"></i>
+        <span>Connexion temps réel interrompue — reconnexion en cours, l'affichage peut être en retard.</span>
+      </div>
+    }
+  }
+}
+
+<div class="app-layout" [class.app-layout--bare]="isLoginRoute" [attr.role]="isLoginRoute ? null : 'main'">
+  <router-outlet></router-outlet>
+</div>
+
+@if (!isLoginRoute) {
+  <app-footer />
+}

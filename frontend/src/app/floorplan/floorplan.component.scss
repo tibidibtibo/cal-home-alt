@@ -1,0 +1,392 @@
+.floorplan-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.floorplan-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+
+  .toolbar-spacer { flex: 1; }
+
+  .edit-card-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .toolbar-divider {
+    width: 1px;
+    height: 1.5rem;
+    background: var(--color-border);
+    margin: 0 0.5rem;
+  }
+
+  .save-error {
+    font-size: 0.8rem;
+    color: var(--color-error, #f44336);
+  }
+}
+
+.btn {
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-md, 0.5rem);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: opacity 0.15s, background 0.15s;
+
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  &.btn-edit, &.btn-save {
+    background: var(--color-primary, #1976d2);
+    color: #fff;
+    border-color: var(--color-primary, #1976d2);
+  }
+
+  &.btn-cancel {
+    background: var(--color-surface, #f5f5f5);
+    color: var(--color-text, #333);
+  }
+
+  &.btn-add-room {
+    background: transparent;
+    color: var(--color-primary, #1976d2);
+    border-color: var(--color-primary, #1976d2);
+  }
+
+  &.btn-grid {
+    background: transparent;
+    color: var(--color-text-muted, #757575);
+    border-color: var(--color-border);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.btn-outline {
+    background: transparent;
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
+    &:hover { background: rgba(var(--color-primary-rgb), 0.1); }
+  }
+
+  &.btn-danger {
+    background: #dc2626;
+    color: white;
+    border: none;
+    &:disabled { background: #fca5a5; cursor: not-allowed; }
+  }
+}
+
+.north-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #757575);
+  white-space: nowrap;
+
+  .north-slider {
+    width: 100px;
+    accent-color: var(--color-primary, #1976d2);
+    cursor: pointer;
+  }
+
+  .north-number {
+    width: 3.8rem;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid var(--color-border, #d1d5db);
+    border-radius: var(--radius-sm, 0.25rem);
+    background: var(--color-background, #fff);
+    color: var(--color-text, #333);
+    font-size: 0.8rem;
+    font-family: inherit;
+    text-align: center;
+  }
+}
+
+// ─── Layout ────────────────────────────────────────────────────────────────────
+
+.floorplan-layout {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.floorplan-wrapper {
+  flex: 1;
+  position: relative;
+  background: var(--color-surface, #f5f5f5);
+  border-radius: var(--radius-lg, 0.75rem);
+  border: 1px solid var(--color-border);
+  padding: 1rem;
+  overflow: hidden;
+
+  &.placing { cursor: crosshair; }
+
+  &.edit-mode { border: 2px dashed var(--color-primary, #1976d2); }
+}
+
+// ─── SVG ───────────────────────────────────────────────────────────────────────
+
+.floorplan-svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  color: var(--color-text, #333);
+  user-select: none;
+
+  // ── Rooms ──
+  .room-rect {
+    fill: transparent;
+    stroke: currentColor;
+    stroke-width: 2;
+
+    &.draggable { cursor: grab; &:active { cursor: grabbing; } }
+  }
+
+  .room-label {
+    font-size: 1.4rem;
+    font-weight: 700;
+    fill: currentColor;
+    text-anchor: middle;
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .resize-handle {
+    fill: var(--color-primary, #1976d2);
+    opacity: 0.7;
+    cursor: se-resize;
+
+    &:hover { opacity: 1; }
+  }
+
+  // ── Delete button ──
+  .delete-btn {
+    cursor: pointer;
+
+    .delete-circle {
+      fill: var(--color-error, #f44336);
+      opacity: 0.8;
+    }
+
+    .delete-icon {
+      fill: #fff;
+      font-size: 0.6rem;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    &:hover .delete-circle { opacity: 1; }
+  }
+
+  // ── Equipment ──
+  .equipment-hit-area {
+    fill: transparent;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .equipment-marker {
+    fill: var(--color-text-muted, #9e9e9e);
+    stroke: var(--color-surface, #fff);
+    stroke-width: 2;
+    transition: fill 0.25s ease, filter 0.15s;
+
+    &.status-open   { fill: var(--color-success, #4caf50); }
+    &.status-middle { fill: var(--color-warning, #ff9800); }
+    &.status-close  { fill: var(--color-error, #f44336); }
+
+    &.draggable  { cursor: grab;    &:active { cursor: grabbing; } }
+    &.clickable  { cursor: pointer; &:hover  { filter: brightness(1.15); } }
+  }
+
+  .equipment-label {
+    font-size: 0.7rem;
+    fill: currentColor;
+    text-anchor: middle;
+    pointer-events: none;
+    opacity: 0.75;
+  }
+
+  // ── Orientation arrows ──
+  .orientation-arrow {
+    pointer-events: none;
+
+    .arrow-shaft {
+      stroke: rgba(255,255,255,0.9);
+      stroke-width: 1.5;
+    }
+
+    .arrow-head {
+      fill: rgba(255,255,255,0.9);
+    }
+  }
+
+  // ── Compass rose ──
+  .compass-indicator {
+    pointer-events: none;
+
+    .compass-bg {
+      fill: var(--color-background, #fff);
+      stroke: var(--color-border, #d1d5db);
+      stroke-width: 1.5;
+      opacity: 0.9;
+    }
+
+    .compass-axis {
+      stroke: var(--color-text-muted, #9e9e9e);
+      stroke-width: 1.5;
+    }
+
+    .compass-north-head {
+      fill: var(--color-primary, #1976d2);
+    }
+
+    .compass-south-head {
+      fill: var(--color-text-muted, #9e9e9e);
+    }
+
+    .compass-n-text {
+      font-size: 0.55rem;
+      font-weight: 700;
+      fill: var(--color-primary, #1976d2);
+      text-anchor: middle;
+      dominant-baseline: auto;
+    }
+  }
+}
+
+// Enable label dblclick in edit mode
+.floorplan-wrapper.edit-mode .room-label {
+  pointer-events: all;
+  cursor: text;
+}
+
+// ─── Rename overlay ─────────────────────────────────────────────────────────────
+
+.rename-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  background: var(--color-background, #fff);
+  border: 2px solid var(--color-primary, #1976d2);
+  border-radius: var(--radius-md, 0.5rem);
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+
+  .rename-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #757575);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .rename-input {
+    font-size: 1rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm, 0.25rem);
+    background: var(--color-surface, #f5f5f5);
+    color: var(--color-text, #333);
+    outline: none;
+
+    &:focus { border-color: var(--color-primary, #1976d2); }
+  }
+}
+
+// ─── Unplaced panel ─────────────────────────────────────────────────────────────
+
+.unplaced-panel {
+  width: 196px;
+  flex-shrink: 0;
+  background: var(--color-surface, #f5f5f5);
+  border-radius: var(--radius-lg, 0.75rem);
+  border: 1px solid var(--color-border);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  .panel-title {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-text-muted, #757575);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .panel-hint {
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #757575);
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  .panel-empty {
+    font-size: 0.82rem;
+    color: var(--color-text-muted, #757575);
+    font-style: italic;
+    margin: 0;
+  }
+
+  .unplaced-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--radius-sm, 0.25rem);
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--color-text, #333);
+    transition: background 0.15s;
+
+    &:hover { background: var(--color-border); }
+
+    &.active {
+      background: color-mix(in srgb, var(--color-primary, #1976d2) 15%, transparent);
+      font-weight: 600;
+    }
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--color-text-muted, #9e9e9e);
+
+    &--open   { background: var(--color-success, #4caf50); }
+    &--middle { background: var(--color-warning, #ff9800); }
+    &--close  { background: var(--color-error, #f44336); }
+  }
+
+  .btn-cancel-place {
+    margin-top: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm, 0.25rem);
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #757575);
+    width: 100%;
+    transition: background 0.15s;
+
+    &:hover { background: var(--color-border); }
+  }
+}

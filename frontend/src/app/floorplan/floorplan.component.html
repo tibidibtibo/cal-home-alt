@@ -1,0 +1,264 @@
+<div class="floorplan-page">
+
+  <div class="floorplan-toolbar">
+    @if (!editMode) {
+      <div class="card-selector">
+        <select [ngModel]="floorplan?.card?.id" (ngModelChange)="onCardChange($event)">
+          @for (card of floorplan?.all_cards; track card.id) {
+            <option [value]="card.id">{{ card.name }}</option>
+          }
+        </select>
+      </div>
+      <button class="btn btn-edit" (click)="enterEditMode()" [disabled]="!floorplan">
+        Modifier le plan
+      </button>
+    } @else {
+      <button class="btn btn-add-room" (click)="addRoom()">+ Ajouter une pièce</button>
+      <button class="btn btn-grid" (click)="cycleGridSize()">Grille : {{ gridSize }}</button>
+      <label class="north-control">
+        Nord
+        <input type="range" class="north-slider"
+          [ngModel]="northAngle"
+          (ngModelChange)="setNorthAngle(+$event)"
+          min="-180" max="180" step="1">
+        <input type="number" class="north-number"
+          [ngModel]="northAngle"
+          (ngModelChange)="setNorthAngle(+$event)"
+          min="-180" max="180" step="1">°
+      </label>
+      <span class="toolbar-sep"></span>
+      <button class="btn btn-new-card" (click)="startCreateCard()">+ Nouvelle carte</button>
+      <button class="btn btn-rename-card" (click)="startRenameCard()">Renommer carte</button>
+      <button class="btn btn-delete-card" (click)="deleteCard()"
+              [disabled]="(floorplan?.all_cards?.length ?? 0) <= 1">Supprimer carte</button>
+      <span class="toolbar-spacer"></span>
+      @if (saveError) {
+        <span class="save-error">Échec de la sauvegarde</span>
+      }
+      <button class="btn btn-cancel" (click)="cancelEdit()">Annuler</button>
+      <button class="btn btn-save" (click)="saveEdit()" [disabled]="saving">
+        {{ saving ? 'Sauvegarde...' : 'Sauvegarder' }}
+      </button>
+    }
+  </div>
+
+  <div class="floorplan-layout">
+    <div class="floorplan-wrapper"
+         [class.edit-mode]="editMode"
+         [class.placing]="placingShutterId !== null">
+
+      @if (floorplan) {
+        <svg #svgEl
+             [attr.viewBox]="floorplan.card.view_box"
+             class="floorplan-svg"
+             (mousemove)="onSvgMouseMove($event)"
+             (mouseup)="onSvgMouseUp()"
+             (mouseleave)="onSvgMouseUp()"
+             (click)="onSvgClick($event)">
+
+          @if (editMode) {
+            <defs>
+              <pattern id="floorplan-grid" [attr.width]="gridSize" [attr.height]="gridSize" patternUnits="userSpaceOnUse">
+                <path [attr.d]="gridPath" fill="none" stroke="rgba(25,118,210,0.18)" stroke-width="0.5"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#floorplan-grid)" />
+          }
+
+          @for (room of floorplan.rooms; track room.id) {
+            <g class="room-group">
+              <rect
+                [attr.x]="room.x"
+                [attr.y]="room.y"
+                [attr.width]="room.width"
+                [attr.height]="room.height"
+                class="room-rect"
+                [class.draggable]="editMode"
+                (mousedown)="onRoomMouseDown($event, room)"
+              />
+
+              @if (renamingRoomId !== room.id) {
+                <text
+                  [attr.x]="room.x + room.width / 2"
+                  [attr.y]="room.y + room.height / 2 + 8"
+                  class="room-label"
+                  (dblclick)="startRename(room.id, room.name, $event)"
+                  (click)="editMode && $event.stopPropagation()"
+                >{{ room.name }}</text>
+              }
+
+              @if (editMode) {
+                <rect
+                  [attr.x]="room.x + room.width - 14"
+                  [attr.y]="room.y + room.height - 14"
+                  width="14" height="14" rx="3"
+                  class="resize-handle"
+                  (mousedown)="onResizeMouseDown($event, room)"
+                />
+
+                <g class="delete-btn" (click)="deleteRoom(room.id, $event)">
+                  <circle
+                    [attr.cx]="room.x + room.width - 10"
+                    [attr.cy]="room.y + 10"
+                    r="9"
+                    class="delete-circle"
+                  />
+                  <text
+                    [attr.x]="room.x + room.width - 10"
+                    [attr.y]="room.y + 10"
+                    class="delete-icon"
+                  >✕</text>
+                </g>
+              }
+            </g>
+          }
+
+          @for (eq of floorplan.devices; track eq.id) {
+            <g class="equipment-group" (click)="onEquipmentClick(eq, $event)">
+              @if (!editMode) {
+                <circle
+                  [attr.cx]="eq.x"
+                  [attr.cy]="eq.y"
+                  r="24"
+                  class="equipment-hit-area"
+                />
+              }
+              <circle
+                [attr.cx]="eq.x"
+                [attr.cy]="eq.y"
+                r="14"
+                class="equipment-marker"
+                [class.status-open]="eq.status === 'open'"
+                [class.status-middle]="eq.status === 'middle'"
+                [class.status-close]="eq.status === 'close'"
+                [class.draggable]="editMode"
+                [class.clickable]="!editMode"
+                (mousedown)="onEquipmentMouseDown($event, eq)"
+              />
+
+              @if (hasOrientation(eq)) {
+                <g class="orientation-arrow"
+                   [attr.transform]="'translate(' + eq.x + ',' + eq.y + ') rotate(' + getArrowAngle(eq) + ')'">
+                  <line x1="0" y1="5" x2="0" y2="-5" class="arrow-shaft"/>
+                  <polygon points="0,-10 -4,-4 4,-4" class="arrow-head"/>
+                </g>
+              }
+
+              <text
+                [attr.x]="eq.x"
+                [attr.y]="eq.y + 26"
+                class="equipment-label"
+              >{{ eq.name }}</text>
+
+              @if (editMode) {
+                <g class="delete-btn" (click)="deleteEquipment(eq.id, $event)">
+                  <circle
+                    [attr.cx]="eq.x + 12"
+                    [attr.cy]="eq.y - 12"
+                    r="8"
+                    class="delete-circle"
+                  />
+                  <text
+                    [attr.x]="eq.x + 12"
+                    [attr.y]="eq.y - 12"
+                    class="delete-icon"
+                  >✕</text>
+                </g>
+              }
+            </g>
+          }
+
+          <!-- Compass rose -->
+          <g class="compass-indicator"
+             [attr.transform]="'translate(' + compassX + ',' + compassY + ')'">
+            <circle r="22" class="compass-bg"/>
+            <g [attr.transform]="'rotate(' + northAngle + ')'">
+              <line x1="0" y1="14" x2="0" y2="-14" class="compass-axis"/>
+              <polygon points="0,-17 -5,-8 5,-8" class="compass-north-head"/>
+              <polygon points="0,17 -4,9 4,9" class="compass-south-head"/>
+              <text x="0" y="-21" class="compass-n-text">N</text>
+            </g>
+          </g>
+        </svg>
+      }
+
+      @if (renamingRoomId !== null) {
+        <div class="rename-overlay">
+          <label class="rename-label">Nom de la pièce</label>
+          <input
+            class="rename-input"
+            [value]="renameValue"
+            (input)="onRenameInput($event)"
+            (keydown.enter)="confirmRename()"
+            (keydown.escape)="renamingRoomId = null"
+            (blur)="confirmRename()"
+          />
+        </div>
+      }
+      @if (creatingCard) {
+        <div class="rename-overlay">
+          <label class="rename-label">Nom de la nouvelle carte</label>
+          <input
+            class="rename-input card-name-input"
+            [value]="newCardName"
+            (input)="newCardName = $any($event.target).value"
+            (keydown.enter)="confirmCreateCard()"
+            (keydown.escape)="cancelCreateCard()"
+          />
+        </div>
+      }
+      @if (renamingCardMode) {
+        <div class="rename-overlay">
+          <label class="rename-label">Nouveau nom de la carte</label>
+          <input
+            class="rename-input card-name-input"
+            [value]="renameCardValue"
+            (input)="renameCardValue = $any($event.target).value"
+            (keydown.enter)="confirmRenameCard()"
+            (keydown.escape)="cancelRenameCard()"
+          />
+        </div>
+      }
+    </div>
+
+    @if (editMode) {
+      <div class="unplaced-panel">
+        <h3 class="panel-title">Équipements</h3>
+
+        @if (unplacedShutters.length === 0) {
+          <p class="panel-empty">Tous les volets sont placés sur le plan.</p>
+        } @else {
+          <p class="panel-hint">
+            @if (placingShutterId === null) {
+              Cliquez pour placer sur le plan
+            } @else {
+              Cliquez sur le plan pour positionner
+            }
+          </p>
+          @for (shutter of unplacedShutters; track shutter.id) {
+            <div
+              class="unplaced-item"
+              [class.active]="placingShutterId === shutter.id"
+              (click)="startPlacement(shutter.id)"
+            >
+              <span class="status-dot" [class]="'status-dot--' + shutter.status"></span>
+              {{ shutter.name }}
+            </div>
+          }
+        }
+
+        @if (placingShutterId !== null) {
+          <button class="btn-cancel-place" (click)="cancelPlacement()">
+            Annuler le placement
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+</div>
+
+<app-shutter-panel
+  [shutter]="selectedShutter"
+  (close)="selectedShutter = null">
+</app-shutter-panel>

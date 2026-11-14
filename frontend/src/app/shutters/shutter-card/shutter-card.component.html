@@ -1,0 +1,80 @@
+<ui-card [heading]="shutter.name">
+  <div class="shutter-controls">
+    <div>
+      <div class="level-row">
+        <span class="level-value" aria-live="polite">{{ level }}<small>%</small></span>
+        <span class="head-actions">
+          <ui-badge [type]="getStatusType()" [pill]="true">{{ getStatusLabel() }}</ui-badge>
+          @if (shutter.db_id) {
+            <a class="gear" routerLink="/shutter-config" [queryParams]="{ edit: shutter.db_id }"
+               [attr.aria-label]="'Configurer ' + shutter.name" title="Nom, pièce, orientation, couleur">
+              <i class="fa-solid fa-gear"></i>
+            </a>
+          }
+        </span>
+      </div>
+      @if (moving) {
+        <span class="moving"><i class="fa-solid fa-spinner fa-spin"></i> En mouvement vers {{ targetLevel }}%…</span>
+      }
+    </div>
+
+    <input type="range" min="0" max="100" step="1" [value]="level" [disabled]="busy"
+           [attr.aria-label]="'Niveau d\'ouverture de ' + shutter.name"
+           (input)="onSliderInput($event)" (change)="onSliderChange($event)">
+
+    <div class="actions" role="group" [attr.aria-label]="'Commandes de ' + shutter.name">
+      <button type="button" class="act" [disabled]="busy" (click)="open()"><i class="fa-solid fa-chevron-up"></i> Ouvrir</button>
+      <button type="button" class="act act--stop" [disabled]="busy" (click)="stop()"><i class="fa-solid fa-stop"></i> Stop</button>
+      <button type="button" class="act" [disabled]="busy" (click)="close()"><i class="fa-solid fa-chevron-down"></i> Fermer</button>
+    </div>
+
+    <div class="presets">
+      <span class="presets-label">Raccourcis</span>
+      @for (p of [25, 50, 75]; track p) {
+        <button type="button" class="chip" [disabled]="busy" (click)="setLevel(p)">{{ p }}%</button>
+      }
+      <button type="button" class="chip chip--sun" [disabled]="busy"
+              [title]="'Mode soleil (' + sunLevel + '%)'"
+              (click)="setLevel(sunLevel)">
+        <i class="fa-solid fa-sun"></i> Soleil ({{ sunLevel }}%)
+      </button>
+      <button type="button" class="chip" [disabled]="busy || shutter.p1_level == null"
+              [title]="shutter.p1_level != null ? 'Position favorite P1 (' + shutter.p1_level + '%)' : 'P1 non configuré'"
+              (click)="shutter.p1_level != null && setLevel(shutter.p1_level)">
+        P1@if (shutter.p1_level != null) { ({{ shutter.p1_level }}%)}
+      </button>
+      <button type="button" class="chip" [disabled]="busy || shutter.p2_level == null"
+              [title]="shutter.p2_level != null ? 'Position favorite P2 (' + shutter.p2_level + '%)' : 'P2 non configuré'"
+              (click)="shutter.p2_level != null && setLevel(shutter.p2_level)">
+        P2@if (shutter.p2_level != null) { ({{ shutter.p2_level }}%)}
+      </button>
+    </div>
+
+    @if (shutter.has_tilt) {
+      <div class="tilt-row">
+        <span class="label">Inclinaison ({{ shutter.tilt_angle }}°)</span>
+        <input type="range" min="0" max="100" step="1" [value]="shutter.tilt_angle" (change)="onTiltChange($event)"
+               [attr.aria-label]="'Inclinaison de ' + shutter.name">
+      </div>
+    }
+
+    @if (shutter.next_action) {
+      <div class="next-action">
+        <i class="fa-solid fa-calendar-check"></i>
+        <span>Prochaine action : <strong>{{ shutter.next_action.action }}</strong> à {{ shutter.next_action.time | date:'HH:mm' }} ({{ shutter.next_action.schedule_name }})</span>
+      </div>
+    }
+
+    @if (!shutter.room_id && rooms.length > 0 && shutter.db_id) {
+      <label class="assign">
+        <span class="label"><i class="fa-solid fa-tag"></i> Classer dans une pièce</span>
+        <select (change)="onAssign($event)" [attr.aria-label]="'Pièce de ' + shutter.name">
+          <option value="">Choisir…</option>
+          @for (r of rooms; track r.id) {
+            <option [value]="r.id">{{ r.name }}</option>
+          }
+        </select>
+      </label>
+    }
+  </div>
+</ui-card>
