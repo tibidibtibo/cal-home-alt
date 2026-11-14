@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 import { catchError, switchMap, throwError } from 'rxjs';
 
 /** Routes d'authentification publiques : seules à ne pas porter le jeton (refresh et sse-ticket, eux, en ont besoin). */
-const PUBLIC_AUTH = /\/api\/auth\/(login|status|setup)/;
+const PUBLIC_AUTH = /\/api\/auth\/(login|status|setup)(?:$|\?)/;
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
