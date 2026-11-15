@@ -9,6 +9,14 @@
   automatisations (heures fixes, lever/coucher du soleil, absence), notifications. Aucun compte en ligne, aucun cloud.
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/status-beta-orange" alt="Statut : beta">
+</p>
+
+> [!WARNING]
+> **Beta-test** : ce projet est en phase de test. Des bugs sont possibles et la configuration ou les données peuvent changer entre deux versions.
+> Les retours sont bienvenus via les [issues](../../issues/new?template=beta-feedback.yml).
+
 > ## ⚠️ Avertissement : projet indépendant, bénévole, sans garantie
 >
 > - **Aucun lien** avec **Calyps'HOME / Calypshome** ni avec **Profalux** (ni filiales, revendeurs, installateurs). Ce projet n'est ni créé, ni approuvé,

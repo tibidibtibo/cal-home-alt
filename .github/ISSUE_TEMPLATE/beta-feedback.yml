@@ -1,0 +1,31 @@
+name: Retour beta-test
+description: Signaler un bug ou un retour pendant la phase de beta-test
+labels: ["beta-feedback"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Que s'est-il passé ?
+      description: Décrivez le problème ou le retour, et ce que vous attendiez.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 1.0.0-beta.1
+  - type: input
+    id: env
+    attributes:
+      label: Environnement (OS, navigateur, modèle de box)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / captures d'écran
+      description: Attention à retirer toute donnée personnelle (adresse IP, identifiants, token).
